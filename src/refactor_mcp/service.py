@@ -135,10 +135,18 @@ class RefactorService:
                 run.output,
             )
         gaps = uncovered_in_scope(scope, run.uncovered)
-        session.phase = after_coverage_check(not gaps)
+        session.phase = after_coverage_check(
+            scope.is_covered(run.uncovered, measured=run.measured)
+        )
         session.rule = Rule.INTENTION if session.phase is Phase.REFACTORING else None
         message = "Coverage run passed."
-        if gaps:
+        if not run.measured:
+            message += (
+                f" No coverage was measured for {scope.render()}, so nothing is "
+                "pinned: an empty report is not a covered scope. Usually no test "
+                "exercises the scope yet."
+            )
+        elif gaps:
             message += (
                 f" Lines in the scope are not covered: {listing(gaps)}. "
                 "Refactoring them would be unguarded, so pin them first."
@@ -190,7 +198,10 @@ class RefactorService:
                 "Undo or fix your last change, then call complete_refactoring "
                 "again. You are in the refactoring phase."
             )
-        if gaps := uncovered_in_scope(scope, run.uncovered):
+        if not scope.is_covered(run.uncovered, measured=run.measured):
+            gaps = uncovered_in_scope(scope, run.uncovered) or {
+                scope.render(): frozenset()
+            }
             raise RefactorError(
                 f"The scope is no longer covered: {listing(gaps)}. A refactoring "
                 "must leave behaviour pinned, so delete code no test requires, "
@@ -329,11 +340,15 @@ class RefactorService:
         """Whether the approval test now covers the scope, measured with coverage."""
         scope = session.scope
         gaps: dict[str, frozenset[int]] = {}
+        covered = False
         if run.outcome is Outcome.PASSED:
             coverage = session.adapter.run_coverage(root)
             gaps = uncovered_in_scope(scope, coverage.uncovered)
+            covered = scope.is_covered(coverage.uncovered, measured=coverage.measured)
+            if not covered and not gaps:
+                gaps = {scope.render(): frozenset()}
         transition = after_approval_write(
-            run.outcome, scope_covered=not gaps, added=added, kind=kind
+            run.outcome, scope_covered=covered, added=added, kind=kind
         )
         if gaps:
             return type(transition)(

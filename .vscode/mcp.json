@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "refactor": {
+      "type": "stdio",
+      "command": "mise",
+      "args": ["-C", "${workspaceFolder}", "run", "run"],
+      "env": {
+        "REFACTOR_MCP_EXEMPT": ""
+      }
+    }
+  }
+}

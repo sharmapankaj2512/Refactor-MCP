@@ -90,7 +90,7 @@ class TypeScriptAdapter:
             uncovered = uncovered_from_istanbul(
                 report.read_text(encoding="utf-8"), root
             )
-            return replace(run, uncovered=uncovered)
+            return replace(run, uncovered=uncovered, measured=True)
 
     def _vitest(self, root: Path, *args: str) -> SuiteRun:
         entry = root / VITEST_ENTRY

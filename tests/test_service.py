@@ -17,6 +17,7 @@ class FakeAdapter:
         self.outcome = Outcome.PASSED
         self.counts = SuiteCounts(tests=1, failures=0)
         self.uncovered: dict[str, frozenset[int]] = {}
+        self.measured = True
         self.test_runs = 0
         self.selections: list[tuple[str | None, str | None]] = []
 
@@ -44,7 +45,13 @@ class FakeAdapter:
         return SuiteRun(self.outcome, "test output", self.counts)
 
     def run_coverage(self, root: Path) -> SuiteRun:
-        return SuiteRun(self.outcome, "coverage output", self.counts, self.uncovered)
+        return SuiteRun(
+            self.outcome,
+            "coverage output",
+            self.counts,
+            self.uncovered,
+            measured=self.measured,
+        )
 
 
 class FakeTree:
@@ -560,3 +567,39 @@ def test_completing_without_history_skips_the_comment_check(adapter, tree, proje
     service.check_coverage(str(project))
 
     assert service.complete_refactoring(str(project)).phase is Phase.SCOPE_REQUIRED
+
+
+def test_an_unmeasured_coverage_run_does_not_unlock_refactoring(
+    service, adapter, project
+):
+    """An empty coverage report means no test ran the scope, not that it is safe."""
+    adapter.measured = False
+    _declare(service, project)
+
+    report = service.check_coverage(str(project))
+
+    assert report.phase is Phase.APPROVAL_TESTS
+    assert "No coverage was measured" in report.message
+
+
+def test_an_unmeasured_approval_run_does_not_unlock_refactoring(
+    service, adapter, project
+):
+    adapter.uncovered = {"invoice.code": frozenset({2})}
+    _to_refactoring(service, adapter, project)
+    adapter.uncovered = {}
+    adapter.measured = False
+
+    report = service.write_file(str(project), "test_invoice", "pins nothing")
+
+    assert report.phase is Phase.APPROVAL_TESTS
+
+
+def test_completing_is_refused_when_coverage_stops_being_measured(
+    service, adapter, project
+):
+    _to_refactoring(service, adapter, project)
+    adapter.measured = False
+
+    with pytest.raises(RefactorError, match="no longer covered"):
+        service.complete_refactoring(str(project))

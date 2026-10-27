@@ -1,0 +1,308 @@
+[
+    {
+        "description": "Show the current refactoring phase, rule and scope, and what may be written.\n\nArgs:\n    location: Path to the project root.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location"
+            ],
+            "title": "refactor_statusArguments",
+            "type": "object"
+        },
+        "name": "refactor_status",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "refactor_statusOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Declare which production files to refactor. The only tool that starts the workflow.\n\nPass the files or folders whose structure you intend to change. Folders\nexpand to the production files inside them; tests, docs and config are\nignored, so a scope of only those is refused. Call it again to start a new\nscope, which discards the current one.\n\nArgs:\n    location: Path to the project root.\n    paths: Files or folders to refactor, relative to `location`.\n    language: The project's language, which decides how tests are run.\n",
+        "input_schema": {
+            "properties": {
+                "language": {
+                    "default": "python",
+                    "enum": [
+                        "python",
+                        "typescript"
+                    ],
+                    "title": "Language",
+                    "type": "string"
+                },
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                },
+                "paths": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Paths",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "location",
+                "paths"
+            ],
+            "title": "declare_scopeArguments",
+            "type": "object"
+        },
+        "name": "declare_scope",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "declare_scopeOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Run the whole suite with branch coverage and measure the declared scope.\n\nA fully covered scope unlocks refactoring. Any uncovered line or untaken\nbranch inside the scope moves you to approval_tests to pin the current\nbehaviour first, and the reply lists exactly which lines are missing. Call\nit again after writing an approval test, or whenever the repository changed\noutside this server.\n\nArgs:\n    location: Path to the project root.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location"
+            ],
+            "title": "check_coverageArguments",
+            "type": "object"
+        },
+        "name": "check_coverage",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "check_coverageOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Move to the next of Kent Beck's rules of simple design while refactoring.\n\nThe rules run in priority order: intention, then duplication, then fewest\nelements. Refuses while the tests fail, because rule 1 (passes all the\ntests) outranks every other rule.\n\nArgs:\n    location: Path to the project root.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location"
+            ],
+            "title": "next_ruleArguments",
+            "type": "object"
+        },
+        "name": "next_rule",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "next_ruleOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Finish the current scope: verify the suite, the coverage and the comments.\n\nRequires the whole suite to pass, every line and branch in the scope to\nstill be covered, and no line changed during this refactoring to hold a\ncomment. Returns to scope_required, ready for the next scope.\n\nArgs:\n    location: Path to the project root.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location"
+            ],
+            "title": "complete_refactoringArguments",
+            "type": "object"
+        },
+        "name": "complete_refactoring",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "complete_refactoringOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Run tests without coverage: faster, for iterating. Never changes the phase.\n\nRuns the whole suite by default. Narrow it with `path` (a test file or\nfolder) and/or `test_name` (matched against test names: pytest `-k`,\nvitest `-t`). Only `check_coverage` and the test runs that\n`write_file`/`edit_file` trigger advance the workflow, so a passing result\nhere unlocks nothing.\n\nArgs:\n    location: Path to the project root.\n    path: Test file or folder, relative to `location` (or absolute, inside it).\n    test_name: Name, or part of a name, of the test(s) to run.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                },
+                "path": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Path"
+                },
+                "test_name": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Test Name"
+                }
+            },
+            "required": [
+                "location"
+            ],
+            "title": "run_testsArguments",
+            "type": "object"
+        },
+        "name": "run_tests",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "run_testsOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Create or overwrite a file, if the current phase allows it, then run the tests.\n\nTest files may be written in approval_tests and refactoring; production\nfiles only in refactoring, once behaviour is pinned. Approved baselines may\nbe written in approval_tests and are locked while refactoring. The test\nresults decide the next phase, shown on the reply's first line.\n\nArgs:\n    location: Path to the project root.\n    path: File path, relative to `location` (or absolute, inside it).\n    content: The complete new file content.\n",
+        "input_schema": {
+            "properties": {
+                "content": {
+                    "title": "Content",
+                    "type": "string"
+                },
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                },
+                "path": {
+                    "title": "Path",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location",
+                "path",
+                "content"
+            ],
+            "title": "write_fileArguments",
+            "type": "object"
+        },
+        "name": "write_file",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "write_fileOutput",
+            "type": "object"
+        }
+    },
+    {
+        "description": "Replace exactly one occurrence of `old_string` in a file, if the phase allows it.\n\nSame phase rules and test run as `write_file`. Prefer it for refactoring:\nsmall, reviewable changes are what keep the tests green.\n\nArgs:\n    location: Path to the project root.\n    path: File path, relative to `location` (or absolute, inside it).\n    old_string: Exact text to replace; must occur exactly once in the file.\n    new_string: Replacement text.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                },
+                "new_string": {
+                    "title": "New String",
+                    "type": "string"
+                },
+                "old_string": {
+                    "title": "Old String",
+                    "type": "string"
+                },
+                "path": {
+                    "title": "Path",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location",
+                "path",
+                "old_string",
+                "new_string"
+            ],
+            "title": "edit_fileArguments",
+            "type": "object"
+        },
+        "name": "edit_file",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "edit_fileOutput",
+            "type": "object"
+        }
+    }
+]

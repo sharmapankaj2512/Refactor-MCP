@@ -26,8 +26,9 @@ class Scope:
     paths: frozenset[str]
     base: str
 
-    def is_covered(self, uncovered: Uncovered) -> bool:
-        return not uncovered_in_scope(self, uncovered)
+    def is_covered(self, uncovered: Uncovered, *, measured: bool) -> bool:
+        """Covered means measured and gapless: an unmeasured scope is unknown, not safe."""
+        return measured and not uncovered_in_scope(self, uncovered)
 
     def render(self) -> str:
         return ", ".join(sorted(self.paths))

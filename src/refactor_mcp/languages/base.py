@@ -22,6 +22,9 @@ class SuiteRun:
     counts: SuiteCounts | None = None
     # Root-relative POSIX path -> line numbers not executed; coverage runs only.
     uncovered: Mapping[str, frozenset[int]] = field(default_factory=dict)
+    # Whether a coverage report was produced: an empty `uncovered` without it
+    # means nothing was measured, not that everything is covered.
+    measured: bool = False
 
 
 class LanguageAdapter(Protocol):

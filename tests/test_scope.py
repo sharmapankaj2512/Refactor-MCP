@@ -114,14 +114,20 @@ def test_a_fully_covered_scope_reports_nothing():
     assert uncovered_in_scope(scope, {}) == {}
 
 
-def test_a_scope_is_fully_covered_when_nothing_is_uncovered():
+def test_a_measured_scope_with_no_gaps_is_fully_covered():
     scope = Scope(paths=frozenset({"a.code"}), base="abc")
-    assert scope.is_covered({}) is True
+    assert scope.is_covered({}, measured=True) is True
 
 
 def test_a_scope_with_an_uncovered_line_is_not_fully_covered():
     scope = Scope(paths=frozenset({"a.code"}), base="abc")
-    assert scope.is_covered({"a.code": frozenset({3})}) is False
+    assert scope.is_covered({"a.code": frozenset({3})}, measured=True) is False
+
+
+def test_an_unmeasured_scope_is_never_treated_as_covered():
+    """No coverage data means unknown; unlocking on it would defeat the gate."""
+    scope = Scope(paths=frozenset({"a.code"}), base="abc")
+    assert scope.is_covered({}, measured=False) is False
 
 
 def test_listing_sorts_paths_and_line_numbers():

@@ -121,7 +121,7 @@ class PythonAdapter:
             uncovered = uncovered_from_coverage_py(
                 report.read_text(encoding="utf-8"), root
             )
-            return replace(run, uncovered=uncovered)
+            return replace(run, uncovered=uncovered, measured=True)
 
     def _pytest(
         self, root: Path, *args: str, extra_env: dict[str, str] | None = None

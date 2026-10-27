@@ -80,4 +80,4 @@ junit-reports/TEST-results.xml
 
 .ignore/
 
-/setup.py
+/setup.py.approval_tests_temp/
