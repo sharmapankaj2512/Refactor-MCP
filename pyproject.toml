@@ -1,0 +1,29 @@
+[project]
+name = "refactoring-mcp"
+version = "0.1.0"
+description = "MCP server that enforces a safe refactoring workflow: scope, coverage, approval tests, then the four rules of simple design"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2.1.1",
+]
+
+[project.scripts]
+refactoring-mcp = "refactor_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "approvaltests>=19.1.1",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/refactor_mcp"]
+
+[tool.coverage.run]
+source = ["src"]
