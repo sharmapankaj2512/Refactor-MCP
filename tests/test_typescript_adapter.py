@@ -199,3 +199,15 @@ def test_coverage_reports_uncovered_lines_without_writing_reports(project: Path)
 def test_coverage_reports_uncovered_lines_by_file(project: Path):
     _write_test(project, "expect(add(1, 2)).toBe(3);")
     assert adapter.run_coverage(project).uncovered["calc.ts"] == frozenset({3})
+
+
+@pytest.mark.parametrize(
+    "path", ["src/invoice.approved.txt", "__tests__/snap.approved.json"]
+)
+def test_approved_baselines_are_their_own_kind(path):
+    assert TypeScriptAdapter().classify(PurePath(path)) is FileKind.APPROVED
+
+
+def test_received_output_is_not_a_baseline():
+    kind = TypeScriptAdapter().classify(PurePath("src/invoice.received.txt"))
+    assert kind is not FileKind.APPROVED

@@ -19,6 +19,7 @@ CODE_SUFFIXES = frozenset({".py", ".pyi"})
 TEST_DIRECTORIES = frozenset({"test", "tests"})
 VENV_INTERPRETERS = (".venv/Scripts/python.exe", ".venv/bin/python")
 COMMENT_DIRECTIVES = ("!", "noqa", "type:", "pragma", "pyright:", "fmt:")
+APPROVED_MARKER = ".approved."
 
 # pytest exit codes: 2 is a collection error (e.g. importing a function that
 # doesn't exist yet), which is a legitimate "red"; 5 means no tests collected.
@@ -74,6 +75,8 @@ class PythonAdapter:
     name = "python"
 
     def classify(self, relative_path: PurePath) -> FileKind:
+        if APPROVED_MARKER in relative_path.name:
+            return FileKind.APPROVED
         if relative_path.suffix not in CODE_SUFFIXES:
             return FileKind.OTHER
         is_test = (

@@ -26,6 +26,7 @@ COMMENT_DIRECTIVES = (
     "prettier-ignore",
     "biome-ignore",
 )
+APPROVED_MARKER = ".approved."
 VITEST_ENTRY = Path("node_modules/vitest/vitest.mjs")
 MISSING_VITEST = (
     f"vitest not found at {VITEST_ENTRY}. "
@@ -39,6 +40,8 @@ class TypeScriptAdapter:
     name = "typescript"
 
     def classify(self, relative_path: PurePath) -> FileKind:
+        if APPROVED_MARKER in relative_path.name:
+            return FileKind.APPROVED
         if relative_path.suffix not in CODE_SUFFIXES:
             return FileKind.OTHER
         # e.g. "calc.test.ts" -> {"test"}; "types.d.ts" -> {"d"}

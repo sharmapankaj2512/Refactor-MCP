@@ -223,3 +223,24 @@ def test_coverage_reports_lines_with_untaken_branches(tmp_path: Path):
         "def add(a, b):\n    if a > 0:\n        b += 0\n    return a + b\n"
     )
     assert adapter.run_coverage(project).uncovered["calc.py"] == frozenset({2})
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tests/manifest.approved.json",
+        "tests/approved_files/VerifyTests.test_one.approved.txt",
+        "invoice.approved.py",
+    ],
+)
+def test_approved_baselines_are_their_own_kind(path):
+    """A refactoring is measured against them, so they must not be rewritten."""
+    assert PythonAdapter().classify(PurePath(path)) is FileKind.APPROVED
+
+
+@pytest.mark.parametrize(
+    "path", ["tests/manifest.received.json", "tests/a.received.txt"]
+)
+def test_received_output_is_not_a_baseline(path):
+    """`.received.*` is transient runner output, not a pinned baseline."""
+    assert PythonAdapter().classify(PurePath(path)) is not FileKind.APPROVED
