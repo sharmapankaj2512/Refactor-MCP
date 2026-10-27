@@ -32,8 +32,11 @@ Refactoring means changing structure without changing behaviour. You cannot know
 behaviour that nothing measures, so production code stays locked until every line **and branch**
 in the declared scope is covered. That single rule is the point of this server.
 
-An empty coverage report does not count as covered: no data means nothing exercised the scope, not
-that the scope is safe. A scope no test touches routes to `approval_tests`, never to `refactoring`.
+"Covered" means **measured and gapless**. A file no test imports has no uncovered lines, so it
+looks exactly like a fully covered file in a coverage report — it is simply absent from it. The
+server therefore requires every scope file to appear in the report *and* have no missing lines or
+branches. A scope no test touches routes to `approval_tests`, never to `refactoring`, and the reply
+names the files nothing exercises.
 
 ### One approval test, pinning what the code does today
 

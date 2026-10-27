@@ -17,7 +17,7 @@ class FakeAdapter:
         self.outcome = Outcome.PASSED
         self.counts = SuiteCounts(tests=1, failures=0)
         self.uncovered: dict[str, frozenset[int]] = {}
-        self.measured = True
+        self.measured = frozenset({"invoice.code"})
         self.test_runs = 0
         self.selections: list[tuple[str | None, str | None]] = []
 
@@ -569,17 +569,17 @@ def test_completing_without_history_skips_the_comment_check(adapter, tree, proje
     assert service.complete_refactoring(str(project)).phase is Phase.SCOPE_REQUIRED
 
 
-def test_an_unmeasured_coverage_run_does_not_unlock_refactoring(
+def test_a_scope_absent_from_the_coverage_report_does_not_unlock_refactoring(
     service, adapter, project
 ):
-    """An empty coverage report means no test ran the scope, not that it is safe."""
-    adapter.measured = False
+    """A file no test imports has no uncovered lines, which looks exactly like full coverage."""
+    adapter.measured = frozenset()
     _declare(service, project)
 
     report = service.check_coverage(str(project))
 
     assert report.phase is Phase.APPROVAL_TESTS
-    assert "No coverage was measured" in report.message
+    assert "No test exercises invoice.code at all" in report.message
 
 
 def test_an_unmeasured_approval_run_does_not_unlock_refactoring(
@@ -588,18 +588,18 @@ def test_an_unmeasured_approval_run_does_not_unlock_refactoring(
     adapter.uncovered = {"invoice.code": frozenset({2})}
     _to_refactoring(service, adapter, project)
     adapter.uncovered = {}
-    adapter.measured = False
+    adapter.measured = frozenset()
 
     report = service.write_file(str(project), "test_invoice", "pins nothing")
 
     assert report.phase is Phase.APPROVAL_TESTS
 
 
-def test_completing_is_refused_when_coverage_stops_being_measured(
+def test_completing_is_refused_when_the_scope_leaves_the_coverage_report(
     service, adapter, project
 ):
     _to_refactoring(service, adapter, project)
-    adapter.measured = False
+    adapter.measured = frozenset()
 
-    with pytest.raises(RefactorError, match="no longer covered"):
+    with pytest.raises(RefactorError, match="no test exercises it"):
         service.complete_refactoring(str(project))

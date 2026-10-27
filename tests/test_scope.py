@@ -116,18 +116,28 @@ def test_a_fully_covered_scope_reports_nothing():
 
 def test_a_measured_scope_with_no_gaps_is_fully_covered():
     scope = Scope(paths=frozenset({"a.code"}), base="abc")
-    assert scope.is_covered({}, measured=True) is True
+    assert scope.is_covered({}, frozenset({"a.code"})) is True
 
 
 def test_a_scope_with_an_uncovered_line_is_not_fully_covered():
     scope = Scope(paths=frozenset({"a.code"}), base="abc")
-    assert scope.is_covered({"a.code": frozenset({3})}, measured=True) is False
+    assert scope.is_covered({"a.code": frozenset({3})}, frozenset({"a.code"})) is False
 
 
-def test_an_unmeasured_scope_is_never_treated_as_covered():
+def test_a_scope_file_absent_from_the_report_is_never_treated_as_covered():
     """No coverage data means unknown; unlocking on it would defeat the gate."""
     scope = Scope(paths=frozenset({"a.code"}), base="abc")
-    assert scope.is_covered({}, measured=False) is False
+    assert scope.is_covered({}, frozenset()) is False
+
+
+def test_a_partly_measured_scope_is_not_covered():
+    scope = Scope(paths=frozenset({"a.code", "b.code"}), base="abc")
+    assert scope.is_covered({}, frozenset({"a.code"})) is False
+
+
+def test_unmeasured_names_the_scope_files_the_report_missed():
+    scope = Scope(paths=frozenset({"a.code", "b.code"}), base="abc")
+    assert scope.unmeasured(frozenset({"a.code"})) == frozenset({"b.code"})
 
 
 def test_listing_sorts_paths_and_line_numbers():

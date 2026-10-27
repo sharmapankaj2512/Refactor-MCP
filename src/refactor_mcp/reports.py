@@ -35,6 +35,21 @@ def uncovered_from_coverage_py(report: str, root: Path) -> dict[str, frozenset[i
     return uncovered
 
 
+def measured_files_coverage_py(report: str, root: Path) -> frozenset[str]:
+    """The files a coverage.py JSON report measured, keyed by root-relative POSIX path.
+
+    A fully covered file holds no missing lines, so it is absent from
+    `uncovered_from_coverage_py`; only this tells it apart from a file no test
+    ever imported.
+    """
+    return frozenset(_relative(name, root) for name in json.loads(report)["files"])
+
+
+def measured_files_istanbul(report: str, root: Path) -> frozenset[str]:
+    """The files an istanbul JSON report measured, keyed by root-relative POSIX path."""
+    return frozenset(_relative(name, root) for name in json.loads(report))
+
+
 def uncovered_from_istanbul(report: str, root: Path) -> dict[str, frozenset[int]]:
     """Start lines of unexecuted statements and untaken branches per file from an istanbul JSON report."""
     uncovered = {}

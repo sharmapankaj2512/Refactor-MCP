@@ -8,7 +8,11 @@ from pathlib import Path, PurePath
 
 from refactor_mcp.phases import FileKind, Outcome
 from refactor_mcp.languages.base import SuiteRun, run_suite
-from refactor_mcp.reports import count_junit, uncovered_from_istanbul
+from refactor_mcp.reports import (
+    count_junit,
+    measured_files_istanbul,
+    uncovered_from_istanbul,
+)
 
 CODE_SUFFIXES = frozenset(
     {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}
@@ -87,10 +91,12 @@ class TypeScriptAdapter:
             report = Path(report_dir) / "coverage-final.json"
             if not report.is_file():
                 return run
-            uncovered = uncovered_from_istanbul(
-                report.read_text(encoding="utf-8"), root
+            text = report.read_text(encoding="utf-8")
+            return replace(
+                run,
+                uncovered=uncovered_from_istanbul(text, root),
+                measured=measured_files_istanbul(text, root),
             )
-            return replace(run, uncovered=uncovered, measured=True)
 
     def _vitest(self, root: Path, *args: str) -> SuiteRun:
         entry = root / VITEST_ENTRY

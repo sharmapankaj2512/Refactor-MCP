@@ -27,9 +27,11 @@ relevant commit before debugging the code.
 
 Before building on a test runner's or coverage tool's output, spike it in a temp
 directory on the edge cases first: import errors, syntax errors, and above all
-**empty suites**. An empty coverage report is the dangerous case here — it looks
-identical to full coverage unless the adapter reports whether it measured
-anything at all.
+**untouched files**. A file no test imports is simply absent from the coverage
+report, so it has no uncovered lines and looks identical to full coverage. The
+adapter must report *which files it measured*, not merely that it measured
+something; a boolean flag is not enough, as an unrelated passing test produces a
+perfectly valid report that omits the scope entirely.
 
 For anything that spawns test subprocesses, run the suite both with and without
 `--cov`: timing differences expose caching and race bugs.

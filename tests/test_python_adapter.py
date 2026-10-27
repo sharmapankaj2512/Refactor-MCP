@@ -204,6 +204,28 @@ def test_coverage_reports_missing_lines(tmp_path: Path):
     assert "calc.py" in run.output
 
 
+def test_coverage_reports_which_files_it_measured(tmp_path: Path):
+    """A fully covered file has no missing lines, so only this proves it was run."""
+    project = _project(tmp_path, "assert add(1, 2) == 3")
+    assert "calc.py" in adapter.run_coverage(project).measured
+
+
+def test_a_file_no_test_imports_is_absent_from_the_measured_set(tmp_path: Path):
+    """The bug this guards: an unrelated passing test makes untouched code look covered."""
+    project = _project(tmp_path, "assert True")
+    (project / "untouched.py").write_text("def never_called():\n    return 1\n")
+
+    run = adapter.run_coverage(project)
+
+    assert "untouched.py" not in run.measured
+    assert "untouched.py" not in run.uncovered
+
+
+def test_a_run_without_coverage_measured_nothing(tmp_path: Path):
+    project = _project(tmp_path, "assert add(1, 2) == 3")
+    assert adapter.run_tests(project).measured == frozenset()
+
+
 def test_coverage_leaves_no_data_file_in_the_project(tmp_path: Path):
     adapter.run_coverage(_project(tmp_path, "assert add(1, 2) == 3"))
     assert not list(tmp_path.glob(".coverage*"))

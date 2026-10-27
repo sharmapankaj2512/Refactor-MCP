@@ -26,9 +26,16 @@ class Scope:
     paths: frozenset[str]
     base: str
 
-    def is_covered(self, uncovered: Uncovered, *, measured: bool) -> bool:
-        """Covered means measured and gapless: an unmeasured scope is unknown, not safe."""
-        return measured and not uncovered_in_scope(self, uncovered)
+    def is_covered(self, uncovered: Uncovered, measured: frozenset[str]) -> bool:
+        """Covered means every file was measured and none has gaps.
+
+        A scope file missing from the coverage report was never imported by a
+        test, which looks identical to full coverage unless checked here.
+        """
+        return self.paths <= measured and not uncovered_in_scope(self, uncovered)
+
+    def unmeasured(self, measured: frozenset[str]) -> frozenset[str]:
+        return self.paths - measured
 
     def render(self) -> str:
         return ", ".join(sorted(self.paths))

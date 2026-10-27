@@ -88,7 +88,24 @@ def test_a_scope_no_test_touches_is_not_treated_as_covered(repo: Path):
     report = check_coverage(location)
 
     assert report.startswith("Phase: approval_tests")
-    assert "No coverage was measured" in report
+    assert "No test exercises invoice.py at all" in report
+
+
+def test_an_unrelated_passing_test_does_not_make_the_scope_look_covered(repo: Path):
+    """A scope file absent from the report has no gaps, which mimics full coverage."""
+    location = str(repo)
+    (repo / "test_unrelated.py").write_text("def test_sanity():\n    assert True\n")
+    _commit_all(repo)
+    declare_scope(location, ["invoice.py"])
+
+    report = check_coverage(location)
+
+    assert report.startswith("Phase: approval_tests")
+    assert "No test exercises invoice.py at all" in report
+
+    with pytest.raises(ToolError, match="not allowed in the approval_tests phase"):
+        write_file(location, "invoice.py", "rewritten")
+    assert (repo / "invoice.py").read_text() == LEGACY
 
 
 def test_the_uncovered_lines_of_a_partly_tested_scope_are_named(repo: Path):

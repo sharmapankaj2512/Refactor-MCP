@@ -24,7 +24,9 @@ committed; repeat edits within one step are allowed.
   through names, docstrings, and tests.
 - The running server keeps the code it was started with. After changing the
   server's own source, ask for a restart before relying on the fix.
-- An empty coverage report means *unmeasured*, not *covered*. Never treat a
-  scope no test touches as safe to refactor.
+- "Covered" means measured *and* gapless. A file absent from the coverage
+  report has no uncovered lines, so it mimics full coverage; `Scope.is_covered`
+  requires every scope file to appear in the report. Never treat a scope no test
+  touches as safe to refactor.
 
 See [README.md](README.md) for the full workflow and registration.

@@ -4,6 +4,8 @@ from pathlib import Path
 from refactor_mcp.reports import (
     SuiteCounts,
     count_junit,
+    measured_files_coverage_py,
+    measured_files_istanbul,
     uncovered_from_coverage_py,
     uncovered_from_istanbul,
 )
@@ -91,3 +93,30 @@ def test_istanbul_json_counts_untaken_branch_lines_as_uncovered(tmp_path: Path):
         }
     )
     assert uncovered_from_istanbul(report, tmp_path) == {"calc.ts": frozenset({2, 6})}
+
+
+def test_measured_files_lists_every_file_coverage_py_reported():
+    """A file absent from the report was never measured, however green it looks."""
+    report = json.dumps(
+        {
+            "files": {
+                "src/a.py": {"missing_lines": [], "missing_branches": []},
+                "src/b.py": {"missing_lines": [3], "missing_branches": []},
+            }
+        }
+    )
+    assert measured_files_coverage_py(report, Path("/root")) == frozenset(
+        {"src/a.py", "src/b.py"}
+    )
+
+
+def test_measured_files_from_istanbul_lists_every_reported_file():
+    report = json.dumps(
+        {
+            "/root/src/a.ts": {"statementMap": {}, "s": {}},
+            "/root/src/b.ts": {"statementMap": {}, "s": {}},
+        }
+    )
+    assert measured_files_istanbul(report, Path("/root")) == frozenset(
+        {"src/a.ts", "src/b.ts"}
+    )

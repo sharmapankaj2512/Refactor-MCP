@@ -201,6 +201,17 @@ def test_coverage_reports_uncovered_lines_by_file(project: Path):
     assert adapter.run_coverage(project).uncovered["calc.ts"] == frozenset({3})
 
 
+def test_coverage_reports_which_files_it_measured(project: Path):
+    """A fully covered file has no uncovered lines, so only this proves it was run."""
+    _write_test(project, "expect(add(1, 2)).toBe(3);")
+    assert "calc.ts" in adapter.run_coverage(project).measured
+
+
+def test_a_run_without_coverage_measured_nothing(project: Path):
+    _write_test(project, "expect(add(1, 2)).toBe(3);")
+    assert adapter.run_tests(project).measured == frozenset()
+
+
 @pytest.mark.parametrize(
     "path", ["src/invoice.approved.txt", "__tests__/snap.approved.json"]
 )

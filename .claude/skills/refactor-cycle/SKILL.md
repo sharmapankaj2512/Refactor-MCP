@@ -33,7 +33,7 @@ around it.
 |---|---|---|
 | `No refactoring started` | No scope for this location | `declare_scope` first |
 | `not allowed in the approval_tests phase` | Production code is locked until behaviour is pinned | Write the approval test; do not retry the edit |
-| `No coverage was measured` | Nothing exercised the scope at all | Write an approval test; an empty report is not coverage |
+| `No test exercises <file> at all` | That file is absent from the coverage report | Write an approval test that imports and calls it; absent is unmeasured, not covered |
 | `Lines in the scope are not covered` | Partial coverage | Extend the approval test to reach those lines |
 | `An approval test must pass` | The test asserts behaviour the code doesn't have | Match the test to today's behaviour, not the desired one |
 | `was reverted` + `must keep the tests passing` | Your edit changed behaviour | Make a smaller change: one rename, one extraction, one move |
@@ -64,3 +64,7 @@ around it.
   `write_file`/`edit_file` trigger move the workflow.
 - **Coverage includes branches.** An `if` whose false path no test takes counts
   as uncovered, so the approval test may need more than one case.
+- **An unrelated passing test proves nothing.** The suite can be green and the
+  report valid while your scope is missing from it entirely. The server checks
+  that each scope file was actually measured, so don't expect a green suite to
+  unlock refactoring by itself.
