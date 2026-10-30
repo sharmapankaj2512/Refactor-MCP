@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import replace
 from pathlib import Path, PurePath
 
-from refactor_mcp.phases import FileKind, Outcome
+from refactor_mcp.phases import FileKind, Outcome, Rule
 from refactor_mcp.languages.base import SuiteRun, run_suite
 from refactor_mcp.reports import (
     count_junit,
@@ -69,6 +69,10 @@ class TypeScriptAdapter:
             else:
                 i += 1
         return frozenset(lines)
+
+    def find_smells(self, source: str, rule: Rule) -> list[str]:
+        """Not implemented for TypeScript: guidance falls back to naming the smells."""
+        return []
 
     def run_tests(
         self, root: Path, path: str | None = None, test_name: str | None = None

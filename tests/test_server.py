@@ -15,6 +15,7 @@ from refactor_mcp.server import (
     next_rule,
     refactor_status,
     run_tests,
+    skip_rule,
     write_file,
 )
 
@@ -142,12 +143,55 @@ def test_a_full_refactoring_workflow(repo: Path):
     _commit_all(repo)
 
     assert "Rule: duplication" in next_rule(location)
+
+    deduped = write_file(
+        location,
+        "invoice.py",
+        "def total(line_items):\n"
+        "    if not line_items:\n"
+        "        return 0\n"
+        "    return sum(cost for _, cost in line_items)\n",
+    )
+    assert "was reverted" not in deduped
+    _commit_all(repo)
     assert "Rule: fewest_elements" in next_rule(location)
+
+    trimmed = write_file(
+        location,
+        "invoice.py",
+        "def total(line_items):\n    return sum(cost for _, cost in line_items)\n",
+    )
+    assert "was reverted" not in trimmed
+    _commit_all(repo)
 
     with pytest.raises(ToolError, match="last rule"):
         next_rule(location)
 
     assert complete_refactoring(location).startswith("Phase: scope_required")
+
+
+def test_advancing_a_rule_that_changed_nothing_is_refused(repo: Path):
+    """The hole that let a 'finished' refactoring skip rules 3 and 4 entirely."""
+    location = str(repo)
+    declare_scope(location, ["invoice.py"])
+    check_coverage(location)
+    write_file(location, "test_invoice.py", APPROVAL_TEST)
+    _commit_all(repo)
+
+    with pytest.raises(ToolError, match="changed no production code"):
+        next_rule(location)
+
+
+def test_a_rule_can_be_skipped_with_a_reason(repo: Path):
+    location = str(repo)
+    declare_scope(location, ["invoice.py"])
+    check_coverage(location)
+    write_file(location, "test_invoice.py", APPROVAL_TEST)
+    _commit_all(repo)
+
+    report = skip_rule(location, "the two line function already reveals intent")
+
+    assert "Rule: duplication" in report
 
 
 def test_a_refactoring_that_breaks_behaviour_is_reverted(repo: Path):

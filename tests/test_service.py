@@ -18,6 +18,7 @@ class FakeAdapter:
         self.counts = SuiteCounts(tests=1, failures=0)
         self.uncovered: dict[str, frozenset[int]] = {}
         self.measured = frozenset({"invoice.code"})
+        self.smells: list[str] = []
         self.test_runs = 0
         self.selections: list[tuple[str | None, str | None]] = []
 
@@ -36,6 +37,9 @@ class FakeAdapter:
             for number, line in enumerate(source.splitlines(), start=1)
             if "#" in line
         )
+
+    def find_smells(self, source: str, rule) -> list[str]:
+        return list(self.smells)
 
     def run_tests(
         self, root: Path, path: str | None = None, test_name: str | None = None
@@ -80,6 +84,9 @@ class FakeHistory:
 
     def changed_lines(self, root: Path, base: str) -> dict[str, frozenset[int]]:
         return dict(self.changed)
+
+    def changed_paths(self, root: Path, base: str) -> frozenset[str]:
+        return frozenset(self.changed)
 
 
 @pytest.fixture
@@ -291,18 +298,20 @@ def test_a_refused_baseline_write_says_where_a_behaviour_change_belongs(
         service.write_file(str(project), "invoice.approved.txt", "moved")
 
 
-def test_the_rules_advance_one_at_a_time(service, adapter, project):
+def test_the_rules_advance_one_at_a_time(service, adapter, tree, project):
     _to_refactoring(service, adapter, project)
     location = str(project)
+    tree.changes = [" M invoice.code"]
 
     assert service.status(location).rule is Rule.INTENTION
     assert service.next_rule(location).rule is Rule.DUPLICATION
     assert service.next_rule(location).rule is Rule.FEWEST_ELEMENTS
 
 
-def test_the_last_rule_cannot_advance_further(service, adapter, project):
+def test_the_last_rule_cannot_advance_further(service, adapter, tree, project):
     _to_refactoring(service, adapter, project)
     location = str(project)
+    tree.changes = [" M invoice.code"]
     service.next_rule(location)
     service.next_rule(location)
 
@@ -324,8 +333,11 @@ def test_next_rule_is_refused_while_the_tests_fail(service, adapter, project):
         service.next_rule(str(project))
 
 
-def test_completing_a_refactoring_returns_to_scope_required(service, adapter, project):
+def test_completing_a_refactoring_returns_to_scope_required(
+    service, adapter, tree, project
+):
     _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
 
     report = service.complete_refactoring(str(project))
 
@@ -443,7 +455,7 @@ def test_the_commit_demand_names_the_refactoring_notation(
     _to_refactoring(service, adapter, project)
     tree.changes = [" M invoice.code"]
 
-    with pytest.raises(RefactorError, match=r"'\. r' for a refactoring"):
+    with pytest.raises(RefactorError, match="racn server"):
         service.edit_file(str(project), "invoice.code", "line one", "first line")
 
 
@@ -543,9 +555,10 @@ def test_completing_skips_the_comment_check_when_the_base_was_rewound(
 
 
 def test_completing_ignores_comments_in_non_code_files(
-    service, adapter, history, project
+    service, adapter, history, tree, project
 ):
     _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
     (project / "notes.md").write_text("# a heading, not a code comment\n")
     history.changed = {"notes.md": frozenset({1})}
 
@@ -603,3 +616,124 @@ def test_completing_is_refused_when_the_scope_leaves_the_coverage_report(
 
     with pytest.raises(RefactorError, match="no test exercises it"):
         service.complete_refactoring(str(project))
+
+
+def _worked(service, project, history, old, new):
+    """An edit plus the commit that closes its step, so a rule has done work."""
+    service.edit_file(str(project), "invoice.code", old, new)
+    history.changed = {"invoice.code": frozenset({1})}
+
+
+def test_next_rule_is_refused_when_the_rule_changed_nothing(service, adapter, project):
+    """The hole that let a 'finished' refactoring skip rules 3 and 4 entirely."""
+    _to_refactoring(service, adapter, project)
+
+    with pytest.raises(RefactorError, match="changed no production code"):
+        service.next_rule(str(project))
+
+
+def test_next_rule_names_the_rules_targets_when_refusing(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+
+    with pytest.raises(RefactorError, match="Hunt:"):
+        service.next_rule(str(project))
+
+
+def test_next_rule_advances_once_the_rule_changed_production_code(
+    service, adapter, history, project
+):
+    _to_refactoring(service, adapter, project)
+    _worked(service, project, history, "line one", "first line")
+
+    assert service.next_rule(str(project)).rule is Rule.DUPLICATION
+
+
+def test_uncommitted_work_counts_as_the_rule_having_done_something(
+    service, adapter, tree, project
+):
+    """Committing mid-rule shouldn't be forced just to advance."""
+    _to_refactoring(service, adapter, project)
+    service.edit_file(str(project), "invoice.code", "line one", "first line")
+    tree.changes = [" M invoice.code"]
+
+    assert service.next_rule(str(project)).rule is Rule.DUPLICATION
+
+
+def test_a_rule_may_be_skipped_with_a_reason(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+
+    report = service.skip_rule(str(project), "names already reveal intent here")
+
+    assert report.rule is Rule.DUPLICATION
+    assert "skipped" in report.message
+
+
+def test_skipping_needs_a_real_reason(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+
+    with pytest.raises(RefactorError, match="reason"):
+        service.skip_rule(str(project), "n/a")
+
+
+def test_a_skip_is_echoed_in_later_status(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+    service.skip_rule(str(project), "names already reveal intent here")
+
+    assert "intention" in service.status(str(project)).message
+
+
+def test_completing_is_refused_while_the_last_rule_changed_nothing(
+    service, adapter, history, tree, project
+):
+    """Reaching the final rule is not the same as having applied it."""
+    _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
+    service.next_rule(str(project))
+    service.next_rule(str(project))
+    tree.changes = []
+    history.changed = {}
+
+    with pytest.raises(RefactorError, match="changed no production code"):
+        service.complete_refactoring(str(project))
+
+
+def test_the_completion_summary_reports_each_rule(service, adapter, history, project):
+    _to_refactoring(service, adapter, project)
+    service.skip_rule(str(project), "names already reveal intent here")
+    service.skip_rule(str(project), "no duplication in a two line file")
+    _worked(service, project, history, "line one", "first line")
+
+    report = service.complete_refactoring(str(project))
+
+    assert "intention" in report.message
+    assert "fewest_elements" in report.message
+
+
+def test_refactoring_guidance_names_the_detected_targets(service, adapter, project):
+    adapter.smells = ["line 1: magic number `7` — give it a name"]
+    report = _to_refactoring(service, adapter, project)
+
+    assert "magic number `7`" in report.message
+
+
+def test_skipping_the_last_rule_points_at_completion(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+    service.skip_rule(str(project), "names already reveal intent here")
+    service.skip_rule(str(project), "no duplication in a two line file")
+
+    report = service.skip_rule(str(project), "nothing left to delete in two lines")
+
+    assert report.rule is Rule.FEWEST_ELEMENTS
+    assert "complete_refactoring" in report.message
+
+
+def test_smells_skip_a_scope_file_that_no_longer_exists(
+    service, adapter, tree, project
+):
+    """A refactoring may delete a file in its own scope; that is not an error."""
+    adapter.smells = ["line 1: magic number `7` — give it a name"]
+    _to_refactoring(service, adapter, project)
+    (project / "invoice.code").unlink()
+    tree.changes = [" D invoice.code"]
+
+    assert service.next_rule(str(project)).rule is Rule.DUPLICATION

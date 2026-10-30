@@ -22,8 +22,12 @@ around it.
    Production code is locked here; don't retry it. Call the scope as a caller
    does, capture the result, approve it. Assert current behaviour, bugs
    included.
-4. **`refactoring`** — `edit_file` in small steps, committing each as `. r`.
+4. **`refactoring`** — `edit_file` in small steps, committing each through the
+   `racn` server's `commit` tool (`risk=proven_safe, intention=refactoring`).
    `next_rule` to move through `intention` → `duplication` → `fewest_elements`.
+   Each rule's guidance lists concrete targets found in your scope; work them,
+   because `next_rule` refuses while a rule has changed nothing. Use
+   `skip_rule` with a reason when the code already satisfies a rule.
 5. **`complete_refactoring(location)`** — verifies suite, coverage and comments,
    then returns to `scope_required`.
 
@@ -43,6 +47,8 @@ around it.
 | `The tests must pass before moving on` | `next_rule` while red | Fix or undo the last change first |
 | `hold comments` | A changed line has a comment | Delete it; let names carry the meaning |
 | `Rule fewest_elements is the last rule` | Nothing left to advance to | Call `complete_refactoring` |
+| `changed no production code` | This rule did nothing, so it was not applied | Make one edit for it, or `skip_rule` with a reason if the code already satisfies it |
+| `Skipping a rule needs a reason` | The reason was too short to be meaningful | Say why the code already satisfies the rule, in a sentence |
 
 ## Pitfalls
 
@@ -64,6 +70,9 @@ around it.
   `write_file`/`edit_file` trigger move the workflow.
 - **Coverage includes branches.** An `if` whose false path no test takes counts
   as uncovered, so the approval test may need more than one case.
+- **Advancing a rule is not applying it.** Calling `next_rule` three times in a
+  row leaves the refactoring unfinished; the server now refuses this, but the
+  habit is the thing to avoid. Read the targets it lists and fix them.
 - **An unrelated passing test proves nothing.** The suite can be green and the
   report valid while your scope is missing from it entirely. The server checks
   that each scope file was actually measured, so don't expect a green suite to

@@ -11,8 +11,9 @@ from dataclasses import replace
 from pathlib import Path, PurePath
 from xml.etree import ElementTree
 
-from refactor_mcp.phases import FileKind, Outcome
+from refactor_mcp.phases import FileKind, Outcome, Rule
 from refactor_mcp.languages.base import SuiteRun, run_suite
+from refactor_mcp.smells import find_python_smells
 from refactor_mcp.reports import (
     SuiteCounts,
     count_junit,
@@ -100,6 +101,9 @@ class PythonAdapter:
             if token.type == tokenize.COMMENT
             and not token.string[1:].lstrip().startswith(COMMENT_DIRECTIVES)
         )
+
+    def find_smells(self, source: str, rule: Rule) -> list[str]:
+        return find_python_smells(source, rule)
 
     def run_tests(
         self, root: Path, path: str | None = None, test_name: str | None = None

@@ -122,7 +122,9 @@ def _nested_functions(tree: ast.AST) -> list[ast.FunctionDef | ast.AsyncFunction
     have no outside caller, so nothing referencing them means dead code."""
     nested = []
     for parent in ast.walk(tree):
-        if not isinstance(parent, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+        if not isinstance(
+            parent, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
+        ):
             continue
         nested += [
             child

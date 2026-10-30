@@ -53,6 +53,34 @@ def is_ancestor(root: Path, commit: str) -> bool:
     return result.returncode == 0
 
 
+def changed_paths(root: Path, base: str) -> frozenset[str]:
+    """Paths touched under `root` since `base`, including purely deleted lines.
+
+    `changed_lines` reads `+` hunk headers, so a change that only removes code
+    produces nothing — yet deleting what no test requires is a refactoring in
+    its own right. This answers "was this file touched at all?".
+    """
+    names = subprocess.run(
+        ["git", "diff", "--name-only", "--relative", base, "--", "."],
+        check=False,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    ).stdout
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", "."],
+        check=False,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    ).stdout
+    return frozenset(names.split()) | frozenset(untracked.split())
+
+
 _HUNK = re.compile(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@")
 
 

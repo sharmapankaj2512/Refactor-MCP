@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import Protocol
 
-from refactor_mcp.phases import FileKind, Outcome
+from refactor_mcp.phases import FileKind, Outcome, Rule
 from refactor_mcp.reports import SuiteCounts
 
 DEFAULT_TIMEOUT_SECONDS = 600
@@ -46,6 +46,10 @@ class LanguageAdapter(Protocol):
         ...
 
     def run_coverage(self, root: Path) -> SuiteRun: ...
+
+    def find_smells(self, source: str, rule: "Rule") -> list[str]:
+        """Concrete, line-anchored targets for `rule`, so guidance names real code."""
+        ...
 
 
 def run_suite(

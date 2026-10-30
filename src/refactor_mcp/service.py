@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from pathlib import Path, PurePath
 from typing import Protocol
@@ -33,6 +33,7 @@ from refactor_mcp.workspace import (
 )
 
 OUTPUT_TAIL_CHARS = 6_000
+MIN_SKIP_REASON = 15
 
 BASELINE_IS_FROZEN = (
     "Approved output is the behavioural baseline a refactoring is measured "
@@ -52,6 +53,8 @@ class History(Protocol):
     def is_ancestor(self, root: Path, commit: str) -> bool: ...
 
     def changed_lines(self, root: Path, base: str) -> dict[str, frozenset[int]]: ...
+
+    def changed_paths(self, root: Path, base: str) -> frozenset[str]: ...
 
 
 @dataclass(frozen=True)
@@ -79,6 +82,9 @@ class _Session:
     rule: Rule | None = None
     tests: int = 0
     step: Phase | None = None
+    # Commit the current rule started from, so "did this rule do anything?" is answerable.
+    rule_base: str = ""
+    skipped: dict[Rule, str] = field(default_factory=dict)
 
 
 class RefactorService:
@@ -139,7 +145,9 @@ class RefactorService:
         session.phase = after_coverage_check(
             scope.is_covered(run.uncovered, run.measured)
         )
-        session.rule = Rule.INTENTION if session.phase is Phase.REFACTORING else None
+        session.rule = None
+        if session.phase is Phase.REFACTORING:
+            self._start_first_rule(session, root)
         message = "Coverage run passed."
         if unmeasured:
             message += (
@@ -156,9 +164,14 @@ class RefactorService:
                 f" Every line and branch in {scope.render()} is covered, so "
                 "refactoring is unlocked."
             )
+        guidance = self._guidance(session)
+        if session.rule:
+            guidance = (
+                f"{PHASE_GUIDANCE[session.phase]} {self._rule_guidance(session, root)}"
+            )
         return Report(
             session.phase,
-            f"{message} {self._guidance(session)}",
+            f"{message} {guidance}",
             run.output,
             rule=session.rule,
         )
@@ -179,13 +192,92 @@ class RefactorService:
                 f"Rule {session.rule} is the last rule of simple design. "
                 "Next: call complete_refactoring to finish this scope."
             )
+        self._require_work(session, root)
+        return self._enter_rule(session, root, following, run.output)
+
+    def skip_rule(self, location: str, reason: str) -> Report:
+        root = _root(location)
+        session = self._refactoring(root)
+        if len(reason.strip()) < MIN_SKIP_REASON:
+            raise RefactorError(
+                f"Skipping a rule needs a reason of at least {MIN_SKIP_REASON} "
+                "characters saying why the code already satisfies it, because the "
+                "skip is recorded and shown when the refactoring completes. You "
+                f"are in the refactoring phase, rule {session.rule}."
+            )
+        skipped = session.rule
+        following = next_rule(skipped)
+        session.skipped[skipped] = reason.strip()
+        if following is None:
+            return Report(
+                session.phase,
+                f"Rule {skipped} skipped: {reason.strip()}. It was the last rule. "
+                "Next: call complete_refactoring to finish this scope.",
+                rule=skipped,
+            )
+        return self._enter_rule(session, root, following, "", skipped=skipped)
+
+    def _enter_rule(
+        self,
+        session: _Session,
+        root: Path,
+        following: Rule,
+        output: str,
+        skipped: Rule | None = None,
+    ) -> Report:
         session.rule = following
+        session.rule_base = self._history.head_commit(root) if self._history else ""
+        opening = f"Rule {skipped} skipped." if skipped else "Tests passed."
         return Report(
             session.phase,
-            f"Tests passed. Moving to rule {following}. {RULE_GUIDANCE[following]}",
-            run.output,
+            f"{opening} Moving to rule {following}. {self._rule_guidance(session, root)}",
+            output,
             rule=following,
         )
+
+    def _start_first_rule(self, session: _Session, root: Path) -> None:
+        """Entering refactoring starts rule 2, measured from the current commit."""
+        session.rule = Rule.INTENTION
+        session.rule_base = self._history.head_commit(root) if self._history else ""
+
+    def _require_work(self, session: _Session, root: Path) -> None:
+        """A rule that changed nothing is a rule nobody applied."""
+        if self._rule_changed_production(session, root):
+            return
+        raise RefactorError(
+            f"Rule {session.rule} changed no production code, so it has not been "
+            f"applied. {self._rule_guidance(session, root)} Make one edit, or "
+            "call skip_rule with a reason if the code already satisfies this rule."
+        )
+
+    def _rule_changed_production(self, session: _Session, root: Path) -> bool:
+        if self._pending_changes(root):
+            return True
+        if not self._history or not session.rule_base:
+            return True
+        if not self._history.is_ancestor(root, session.rule_base):
+            return True
+        return any(
+            session.adapter.classify(PurePath(path)) is FileKind.PRODUCTION
+            for path in self._history.changed_paths(root, session.rule_base)
+        )
+
+    def _rule_guidance(self, session: _Session, root: Path) -> str:
+        guidance = RULE_GUIDANCE[session.rule]
+        if found := self._smells(session, root):
+            listed = "\n".join(f"  - {finding}" for finding in found)
+            guidance += f"\nFound in the scope:\n{listed}"
+        return guidance
+
+    def _smells(self, session: _Session, root: Path) -> list[str]:
+        found = []
+        for path in sorted(session.scope.paths):
+            target = root / path
+            if not target.is_file():
+                continue
+            source = target.read_text(encoding="utf-8", errors="replace")
+            found += session.adapter.find_smells(source, session.rule)
+        return found
 
     def complete_refactoring(self, location: str) -> Report:
         root = _root(location)
@@ -206,6 +298,7 @@ class RefactorService:
                 "then call complete_refactoring again. You are in the refactoring "
                 "phase."
             )
+        self._require_work(session, root)
         if commented := self._commented_changes(session, root):
             raise RefactorError(
                 f"Lines changed in this refactoring hold comments: "
@@ -213,11 +306,12 @@ class RefactorService:
                 "comments did, then call complete_refactoring again. You are in "
                 "the refactoring phase."
             )
+        summary = self._rule_summary(session)
         self._sessions.pop(root, None)
         return Report(
             Phase.SCOPE_REQUIRED,
             f"Refactoring complete: {scope.render()} is covered, the suite "
-            "passes, and no changed line holds a comment. "
+            f"passes, and no changed line holds a comment. {summary} "
             f"{PHASE_GUIDANCE[Phase.SCOPE_REQUIRED]}",
             run.output,
         )
@@ -318,7 +412,7 @@ class RefactorService:
             transition = after_refactor_write(run.outcome, kind, added=added)
         session.phase = transition.phase
         if transition.phase is Phase.REFACTORING and session.rule is None:
-            session.rule = Rule.INTENTION
+            self._start_first_rule(session, root)
         if not transition.revert:
             session.tests = counts.tests
         message = f"Tests {run.outcome}."
@@ -402,7 +496,18 @@ class RefactorService:
         guidance = PHASE_GUIDANCE[session.phase]
         if session.phase is Phase.REFACTORING and session.rule:
             guidance += f" {RULE_GUIDANCE[session.rule]}"
+        if session.skipped:
+            guidance += f" {self._rule_summary(session)}"
         return guidance
+
+    def _rule_summary(self, session: _Session) -> str:
+        parts = [
+            f"{rule}: skipped — {session.skipped[rule]}"
+            if rule in session.skipped
+            else f"{rule}: applied"
+            for rule in Rule
+        ]
+        return "Rules of simple design — " + "; ".join(parts) + "."
 
     def _locked(self, session: _Session, kind: FileKind, phase: Phase) -> RefactorError:
         if kind is FileKind.APPROVED and phase is Phase.REFACTORING:
@@ -429,8 +534,10 @@ def _uncommitted(root: Path, changes: list[str], phase: Phase) -> RefactorError:
     return RefactorError(
         f"Uncommitted changes in {root}: "
         f"{', '.join(line.strip() for line in changes)}. "
-        "Commit them first (git add, then commit: '. t' for an approval test, "
-        "'. r' for a refactoring), then retry this edit. You are in the "
+        "Commit them first: use the racn server's `commit` tool if it is "
+        "available (risk=proven_safe, intention=test_only for an approval test, "
+        "intention=refactoring for a refactoring), else git add and commit with "
+        "that notation ('. t', '. r'). Then retry this edit. You are in the "
         f"{phase} phase."
     )
 

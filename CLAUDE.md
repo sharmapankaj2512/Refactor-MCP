@@ -8,13 +8,20 @@ test if anything is uncovered, then refactor through the rules of simple design
 with `next_rule`, and finish with `complete_refactoring`. Call `refactor_status`
 if unsure what the current phase allows.
 
+Each rule must do real work: `next_rule` refuses while the current rule has
+changed no production code, and names the concrete targets it found in the
+scope. If the code already satisfies a rule, `skip_rule` with a reason — it is
+recorded and shown when the refactoring completes.
+
 New behaviour is not refactoring: this server reverts any edit that adds a test.
 Use a test-driven cycle for that.
 
 # Committing
 
-Commit every step separately: an approval test as `. t`, each refactoring as
-`. r`. The server refuses the next step's edits until the previous one is
+Commit every step separately, through the `racn` MCP server's `commit` tool:
+`risk=proven_safe, intention=test_only` for an approval test, and
+`risk=proven_safe, intention=refactoring` for a refactoring. Don't hand-write
+the notation — the tool generates and validates it. The server refuses the next step's edits until the previous one is
 committed; repeat edits within one step are allowed.
 
 # Notes

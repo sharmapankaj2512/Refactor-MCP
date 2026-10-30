@@ -38,7 +38,10 @@ mcp = MCPServer(
         "line and branch in the scope is covered. (4) refactoring: work Kent "
         "Beck's rules of simple design one at a time, calling `next_rule` to "
         "move on: rule 2 reveals intention, rule 3 removes duplication, rule 4 "
-        "leaves fewest elements. Rule 1, passes all the tests, is always on: "
+        "leaves fewest elements. `next_rule` refuses while a rule has changed "
+        "nothing, so each rule must do real work or be passed over with "
+        "`skip_rule` and a reason; the guidance names concrete targets it found "
+        "in your scope. Rule 1, passes all the tests, is always on: "
         "any edit that breaks the tests or adds a test is reverted, and "
         "approved baselines are locked so a green test can't be faked. A lower "
         "rule never justifies breaking a higher one. Call "
@@ -48,8 +51,11 @@ mcp = MCPServer(
         "to see the phase, rule and scope. `run_tests` never changes the phase. "
         "Non-code files (docs, config) can be written in any phase and don't "
         "run the tests. Neither do paths matching the server's "
-        "`REFACTOR_MCP_EXEMPT` patterns. Commit each step before the next "
-        "('. t' for an approval test, '. r' for a refactoring); repeat "
+        "`REFACTOR_MCP_EXEMPT` patterns. Commit each step before the next: use "
+        "the `racn` server's `commit` tool when it is available "
+        "(risk=proven_safe, intention=test_only for an approval test, "
+        "intention=refactoring for a refactoring), else git add and commit "
+        "with that notation ('. t', '. r'); repeat "
         "edits within one step amend it. New behaviour is not refactoring: it "
         "belongs in a test-driven cycle."
     ),
@@ -139,6 +145,24 @@ def next_rule(location: str) -> str:
     """
     with _refusals_as_tool_errors():
         return service.next_rule(location).render()
+
+
+@mcp.tool()
+def skip_rule(location: str, reason: str) -> str:
+    """Move past a rule of simple design the code already satisfies, on the record.
+
+    Use it only when the scope genuinely needs no change for the current rule;
+    `next_rule` refuses while a rule has changed nothing, because a rule nobody
+    applied is a rule nobody applied. The reason is recorded and shown in every
+    later reply and in the completion summary, so say why the code already
+    satisfies the rule.
+
+    Args:
+        location: Path to the project root.
+        reason: Why the scope already satisfies the current rule.
+    """
+    with _refusals_as_tool_errors():
+        return service.skip_rule(location, reason).render()
 
 
 @mcp.tool()

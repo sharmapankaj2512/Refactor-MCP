@@ -64,6 +64,25 @@ automatically, as is any edit that adds a test, because new behaviour is not ref
 rule never justifies breaking a higher one — extracting a well-named method adds an element, and
 rule 2 still wins.
 
+**A rule that changed nothing was not applied.** `next_rule` and `complete_refactoring` refuse
+while the current rule has touched no production code in the scope, because a counter you can
+advance for free is not a workflow. When the code genuinely satisfies a rule already, call
+`skip_rule(location, reason)`: the reason is recorded and echoed in every later reply and in the
+completion summary, so an honest skip stays possible but becomes visible rather than silent.
+
+To make the rules actionable rather than aspirational, each rule's guidance names **concrete
+targets found in your scope** — not just smell categories. For Python this is a cheap `ast` pass
+per rule:
+
+| Rule | Detects |
+|---|---|
+| `intention` | long methods, magic numbers, cryptic names |
+| `duplication` | repeated statement sequences across functions (matched on shape, so duplicated control flow around differing bodies still counts) |
+| `fewest_elements` | private methods nothing calls |
+
+TypeScript has no detector yet and falls back to the generic guidance rather than claiming a clean
+scope.
+
 `next_rule` refuses while the tests fail, and `complete_refactoring` requires the suite to pass,
 the scope to still be covered, and no line changed during the refactoring to hold a comment. Say it
 with names instead. Tool directives stay allowed: `# noqa`, `# type:`, `# pragma`, `# pyright:`,
@@ -82,7 +101,9 @@ trigger a test run.
 - `check_coverage(location)` — run the whole suite with branch coverage and measure the scope.
   Fully covered unlocks refactoring; anything uncovered routes to `approval_tests` and names the
   missing lines. Call it again after a server restart or when the repository changed underneath.
-- `next_rule(location)` — move to the next rule of simple design. Refuses while the tests fail.
+- `next_rule(location)` — move to the next rule of simple design. Refuses while the tests fail, and
+  while the current rule has changed no production code.
+- `skip_rule(location, reason)` — pass over a rule the code already satisfies, on the record.
 - `complete_refactoring(location)` — verify the suite, the scope's coverage and the comments, then
   return to `scope_required`.
 - `run_tests(location, path=None, test_name=None)` — run tests without coverage, for fast
@@ -100,7 +121,11 @@ Each step's edits must be committed before the next step starts. Uncommitted cha
 unstaged, or untracked; ignored files don't count) anywhere under `location` belong to the step
 that was active when the tree was last clean. Repeat edits within that step are allowed, so one
 refactoring can take several `edit_file` calls. Commit an approval test as `. t` and each
-refactoring as `. r`.
+refactoring as `. r`. When the
+[`racn`](https://github.com/RefactoringCombos/ArlosCommitNotation) MCP server is configured, the
+server's messages point at its `commit` tool (`risk=proven_safe`, `intention=test_only` for an
+approval test, `intention=refactoring` for a refactoring) so the notation is generated and
+validated rather than hand-typed.
 
 The project must be a git repository. `refactor_status`, `check_coverage`, `run_tests` and
 `complete_refactoring` aren't gated, and Python coverage data is written to a temp directory so

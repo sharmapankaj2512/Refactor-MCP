@@ -4,7 +4,7 @@ from pathlib import Path, PurePath
 
 import pytest
 
-from refactor_mcp.phases import FileKind, Outcome
+from refactor_mcp.phases import FileKind, Outcome, Rule
 from refactor_mcp.languages import ADAPTERS
 from refactor_mcp.languages.typescript import TypeScriptAdapter
 
@@ -222,3 +222,9 @@ def test_approved_baselines_are_their_own_kind(path):
 def test_received_output_is_not_a_baseline():
     kind = TypeScriptAdapter().classify(PurePath("src/invoice.received.txt"))
     assert kind is not FileKind.APPROVED
+
+
+def test_smell_detection_is_not_implemented_for_typescript():
+    """Returning nothing falls back to generic guidance rather than claiming a clean scope."""
+    source = "export function f(a: number) {\n  return a * 3.7;\n}\n"
+    assert TypeScriptAdapter().find_smells(source, Rule.INTENTION) == []

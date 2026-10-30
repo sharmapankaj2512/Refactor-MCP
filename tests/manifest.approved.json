@@ -137,6 +137,41 @@
         }
     },
     {
+        "description": "Move past a rule of simple design the code already satisfies, on the record.\n\nUse it only when the scope genuinely needs no change for the current rule;\n`next_rule` refuses while a rule has changed nothing, because a rule nobody\napplied is a rule nobody applied. The reason is recorded and shown in every\nlater reply and in the completion summary, so say why the code already\nsatisfies the rule.\n\nArgs:\n    location: Path to the project root.\n    reason: Why the scope already satisfies the current rule.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                },
+                "reason": {
+                    "title": "Reason",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location",
+                "reason"
+            ],
+            "title": "skip_ruleArguments",
+            "type": "object"
+        },
+        "name": "skip_rule",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "skip_ruleOutput",
+            "type": "object"
+        }
+    },
+    {
         "description": "Finish the current scope: verify the suite, the coverage and the comments.\n\nRequires the whole suite to pass, every line and branch in the scope to\nstill be covered, and no line changed during this refactoring to hold a\ncomment. Returns to scope_required, ready for the next scope.\n\nArgs:\n    location: Path to the project root.\n",
         "input_schema": {
             "properties": {

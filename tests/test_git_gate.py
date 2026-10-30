@@ -6,6 +6,7 @@ import pytest
 from refactor_mcp.git_gate import (
     GitError,
     changed_lines,
+    changed_paths,
     head_commit,
     is_ancestor,
     uncommitted_changes,
@@ -98,3 +99,43 @@ def test_changed_lines_counts_every_line_of_untracked_files(repo: Path):
     (repo / "src").mkdir()
     (repo / "src" / "new.py").write_text("x = 1\ny = 2\n")
     assert changed_lines(repo, head_commit(repo)) == {"src/new.py": frozenset({1, 2})}
+
+
+def _commit_all(repo: Path, message: str) -> None:
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-m", message)
+
+
+def test_changed_paths_includes_a_file_whose_lines_were_only_deleted(repo: Path):
+    """Rule 4 deletes code; a gate blind to deletions cannot see that work happened."""
+    (repo / "calc.py").write_text("def add(a, b):\n    extra = 1\n    return a + b\n")
+    _commit_all(repo, "with extra")
+    base = head_commit(repo)
+    (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n")
+    _commit_all(repo, "without extra")
+
+    assert "calc.py" in changed_paths(repo, base)
+
+
+def test_changed_paths_includes_a_modified_file(repo: Path):
+    (repo / "calc.py").write_text("x = 1\n")
+    _commit_all(repo, "one")
+    base = head_commit(repo)
+    (repo / "calc.py").write_text("x = 2\n")
+    _commit_all(repo, "two")
+
+    assert "calc.py" in changed_paths(repo, base)
+
+
+def test_changed_paths_includes_an_untracked_file(repo: Path):
+    base = head_commit(repo)
+    (repo / "new.py").write_text("x = 1\n")
+
+    assert "new.py" in changed_paths(repo, base)
+
+
+def test_changed_paths_is_empty_without_changes_since_the_base(repo: Path):
+    (repo / "calc.py").write_text("x = 1\n")
+    _commit_all(repo, "one")
+
+    assert changed_paths(repo, head_commit(repo)) == frozenset()
