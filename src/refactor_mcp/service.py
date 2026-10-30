@@ -24,6 +24,13 @@ from refactor_mcp.phases import (
 )
 from refactor_mcp.reports import SuiteCounts
 from refactor_mcp.scope import Scope, expand, listing, uncovered_in_scope
+from refactor_mcp.simple_design import (
+    PRIORITY,
+    Targets,
+    conflicts,
+    loop_settled,
+    outstanding,
+)
 from refactor_mcp.workspace import (
     Snapshot,
     replace_once,
@@ -193,6 +200,8 @@ class RefactorService:
                 "Next: call complete_refactoring to finish this scope."
             )
         self._require_work(session, root)
+        if following is Rule.FEWEST_ELEMENTS:
+            self._require_settled_loop(session, root)
         return self._enter_rule(session, root, following, run.output)
 
     def skip_rule(self, location: str, reason: str) -> Report:
@@ -240,6 +249,73 @@ class RefactorService:
         session.rule = Rule.INTENTION
         session.rule_base = self._history.head_commit(root) if self._history else ""
 
+    def rule_status(self, location: str) -> Report:
+        """Every rule of simple design, in priority order, with what it still sees."""
+        root = _root(location)
+        session = self._refactoring(root)
+        targets = self._targets(session, root)
+        lines = []
+        for rank, rule in enumerate(PRIORITY, start=2):
+            found = targets.listing(rule)
+            state = "outstanding" if found else "satisfied"
+            lines.append(f"  rule {rank} {rule}: {state}")
+            lines += [f"    - {finding}" for finding in found]
+        settled = loop_settled(targets)
+        loop = (
+            "Rules 2 and 3 have settled, so rule 4 (fewest elements) is open."
+            if settled
+            else "The rules 2 and 3 loop is still running: naming reveals "
+            "duplication, and removing duplication creates names. Rule 4 stays "
+            "locked until both are clean at once."
+        )
+        following = outstanding(targets)
+        work = (
+            f"Highest outstanding rule: {following[0]}."
+            if following
+            else "No rule has outstanding targets."
+        )
+        return Report(
+            session.phase,
+            "Rules of simple design, highest priority first:\n"
+            + "\n".join(lines)
+            + f"\n{loop} {work}",
+            rule=session.rule,
+        )
+
+    def _require_settled_loop(self, session: _Session, root: Path) -> None:
+        targets = self._targets(session, root)
+        if loop_settled(targets):
+            return
+        remaining = "; ".join(
+            f"{rule}: {', '.join(targets.listing(rule))}"
+            for rule in PRIORITY[:2]
+            if targets.count(rule)
+        )
+        raise RefactorError(
+            "Rule 4 (fewest elements) applies once rules 2 and 3 have settled: "
+            "deleting elements while duplication remains hides it instead of "
+            f"removing it. Still outstanding — {remaining}. Next: work the "
+            "highest outstanding rule, then call next_rule again."
+        )
+
+    def _targets(self, session: _Session, root: Path) -> Targets:
+        return Targets(
+            {rule: tuple(self._smells_for(session, root, rule)) for rule in PRIORITY}
+        )
+
+    def _smells_for(self, session: _Session, root: Path, rule: Rule) -> list[str]:
+        found = []
+        for path in sorted(session.scope.paths):
+            found += self._smells_in(session, root / path, rule)
+        return found
+
+    def _smells_in(self, session: _Session, target: Path, rule: Rule) -> list[str]:
+        """Nothing to read when a refactoring deleted a file in its own scope."""
+        if not target.is_file():
+            return []
+        source = target.read_text(encoding="utf-8", errors="replace")
+        return list(session.adapter.find_smells(source, rule))
+
     def _require_work(self, session: _Session, root: Path) -> None:
         """A rule that changed nothing is a rule nobody applied, unless it was skipped."""
         if session.rule in session.skipped:
@@ -266,20 +342,10 @@ class RefactorService:
 
     def _rule_guidance(self, session: _Session, root: Path) -> str:
         guidance = RULE_GUIDANCE[session.rule]
-        if found := self._smells(session, root):
+        if found := self._smells_for(session, root, session.rule):
             listed = "\n".join(f"  - {finding}" for finding in found)
             guidance += f"\nFound in the scope:\n{listed}"
         return guidance
-
-    def _smells(self, session: _Session, root: Path) -> list[str]:
-        found = []
-        for path in sorted(session.scope.paths):
-            target = root / path
-            if not target.is_file():
-                continue
-            source = target.read_text(encoding="utf-8", errors="replace")
-            found += session.adapter.find_smells(source, session.rule)
-        return found
 
     def complete_refactoring(self, location: str) -> Report:
         root = _root(location)
@@ -387,6 +453,9 @@ class RefactorService:
                 raise _uncommitted(root, changes, session.phase)
             raise self._locked(session, kind, phase)
 
+        before = (
+            self._targets(session, root) if session.phase is Phase.REFACTORING else None
+        )
         snapshot = change(target)
         if kind is FileKind.OTHER:
             return Report(
@@ -394,7 +463,7 @@ class RefactorService:
                 f"Wrote {path} (not code; tests not run).",
                 rule=session.rule,
             )
-        return self._after_write(session, root, phase, kind, path, snapshot)
+        return self._after_write(session, root, phase, kind, path, snapshot, before)
 
     def _after_write(
         self,
@@ -404,6 +473,7 @@ class RefactorService:
         kind: FileKind,
         path: str,
         snapshot: Snapshot,
+        before: Targets | None = None,
     ) -> Report:
         run = session.adapter.run_tests(root)
         counts = run.counts or SuiteCounts(tests=session.tests, failures=0)
@@ -423,6 +493,10 @@ class RefactorService:
         if transition.revert:
             restore(snapshot)
             message += f" {path} was reverted."
+        elif before is not None and (
+            traded := conflicts(before, self._targets(session, root))
+        ):
+            message += f" {traded}"
         return Report(
             session.phase,
             f"{message} {self._guidance(session)}",

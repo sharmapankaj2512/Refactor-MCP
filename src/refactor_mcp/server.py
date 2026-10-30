@@ -38,7 +38,7 @@ mcp = MCPServer(
         "line and branch in the scope is covered. (4) refactoring: work Kent "
         "Beck's rules of simple design one at a time, calling `next_rule` to "
         "move on: rule 2 reveals intention, rule 3 removes duplication, rule 4 "
-        "leaves fewest elements. `next_rule` refuses while a rule has changed "
+        "leaves fewest elements. Rules 2 and 3 feed each other — naming reveals duplication and removing duplication creates names — so they loop until both are clean at once, and only then does rule 4 apply; call `rule_status` to see which rule has the highest-priority work left. `next_rule` refuses while a rule has changed "
         "nothing, so each rule must do real work or be passed over with "
         "`skip_rule` and a reason; the guidance names concrete targets it found "
         "in your scope. Rule 1, passes all the tests, is always on: "
@@ -130,6 +130,23 @@ def check_coverage(location: str) -> str:
     """
     with _refusals_as_tool_errors():
         return service.check_coverage(location).render()
+
+
+@mcp.tool()
+def rule_status(location: str) -> str:
+    """Show every rule of simple design, in priority order, and what it still sees.
+
+    Rules 2 (reveals intention) and 3 (no duplication) feed each other: naming a
+    concept exposes the duplication it hid, and removing duplication creates an
+    abstraction that needs a name. They loop until both are clean at the same
+    moment, and only then does rule 4 (fewest elements) apply. Use this to see
+    which rule has the highest-priority outstanding work.
+
+    Args:
+        location: Path to the project root.
+    """
+    with _refusals_as_tool_errors():
+        return service.rule_status(location).render()
 
 
 @mcp.tool()

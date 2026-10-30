@@ -51,7 +51,30 @@ says where a real behaviour change belongs: a test-driven cycle.
 
 ### The four rules of simple design, one at a time
 
-`refactoring` walks Kent Beck's rules in priority order, and `next_rule` moves between them:
+The rules are a **priority order**, not a pipeline: among designs that pass the tests, prefer the
+one that reveals intention; among those, the one without duplication; among those, the one with
+fewest elements. You consult them at every decision rather than finishing one and moving on.
+
+**Rules 2 and 3 form a loop.** Naming a concept exposes the duplication it was hiding, and removing
+duplication creates an abstraction that needs a name. They feed each other, so they iterate until
+both are clean *at the same moment* — and only then does rule 4 apply, because deleting elements
+while duplication remains hides it instead of removing it.
+
+Measured on the Gilded Rose kata, naming cleared intention 5→1→0, at which point duplication
+appeared 0→1; removing it reached the fixpoint, and rule 4 ran last:
+
+```
+commit    intention  duplication   loop      rule 4
+8fd6ee7       1           0        running   locked
+5b89c59       0           1        running   locked   <- naming exposed duplication
+61d327a       0           0        SETTLED   open     <- fixpoint
+6e4be13       0           0        SETTLED   open     <- rule 4 work
+```
+
+`rule_status` shows all three rules with their state and detected targets, and names the highest
+outstanding one. `next_rule` refuses to enter rule 4 until the loop settles. When an edit buys a
+lower-ranked rule by spending a higher-ranked one — extracting a cryptically named helper to kill
+duplication — the reply says which rule outranks which:
 
 | Rule | Hunt for |
 |---|---|
@@ -101,8 +124,11 @@ trigger a test run.
 - `check_coverage(location)` — run the whole suite with branch coverage and measure the scope.
   Fully covered unlocks refactoring; anything uncovered routes to `approval_tests` and names the
   missing lines. Call it again after a server restart or when the repository changed underneath.
-- `next_rule(location)` — move to the next rule of simple design. Refuses while the tests fail, and
-  while the current rule has changed no production code.
+- `rule_status(location)` — all three rules in priority order, their state, detected targets, and
+  whether the 2↔3 loop has settled.
+- `next_rule(location)` — move to the next rule of simple design. Refuses while the tests fail,
+  while the current rule has changed no production code, and (for rule 4) while the 2↔3 loop is
+  still running.
 - `skip_rule(location, reason)` — pass over a rule the code already satisfies, on the record.
 - `complete_refactoring(location)` — verify the suite, the scope's coverage and the comments, then
   return to `scope_required`.

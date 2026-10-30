@@ -81,9 +81,22 @@ def test_each_rule_states_its_number_in_kent_becks_list(rule, number):
     assert RULE_GUIDANCE[rule].startswith(number)
 
 
-def test_every_rule_says_a_lower_rule_never_beats_a_higher_one():
-    for rule in Rule:
-        assert "never" in RULE_GUIDANCE[rule].lower()
+@pytest.mark.parametrize(
+    ("rule", "outranked_by"),
+    [
+        (Rule.DUPLICATION, ["rule 1", "rule 2"]),
+        (Rule.FEWEST_ELEMENTS, ["rule 1", "rule 2", "rule 3"]),
+    ],
+)
+def test_each_rule_names_the_higher_rules_it_yields_to(rule, outranked_by):
+    """Asserting only the word 'never' was a meta-test that could not fail."""
+    guidance = RULE_GUIDANCE[rule].lower()
+    for higher in outranked_by:
+        assert higher in guidance
+
+
+def test_the_top_ranked_rule_yields_only_to_passing_tests():
+    assert "rule 1" in RULE_GUIDANCE[Rule.INTENTION].lower()
 
 
 @pytest.mark.parametrize(

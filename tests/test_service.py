@@ -19,6 +19,9 @@ class FakeAdapter:
         self.uncovered: dict[str, frozenset[int]] = {}
         self.measured = frozenset({"invoice.code"})
         self.smells: list[str] = []
+        self.smells_by_rule: dict = {}
+        # Successive answers, so a write can change what the detector sees.
+        self.smells_sequence: list[dict] = []
         self.test_runs = 0
         self.selections: list[tuple[str | None, str | None]] = []
 
@@ -39,6 +42,12 @@ class FakeAdapter:
         )
 
     def find_smells(self, source: str, rule) -> list[str]:
+        if self.smells_sequence:
+            # One dict per test run: the write between them changes what is seen.
+            index = min(self.test_runs, len(self.smells_sequence) - 1)
+            return list(self.smells_sequence[index].get(rule, ()))
+        if self.smells_by_rule:
+            return list(self.smells_by_rule.get(rule, ()))
         return list(self.smells)
 
     def run_tests(
@@ -761,3 +770,66 @@ def test_advancing_past_a_skipped_rule_needs_no_edit(service, adapter, project):
     assert service.skip_rule(str(project), "no duplication in two lines").rule is (
         Rule.FEWEST_ELEMENTS
     )
+
+
+def test_advancing_to_rule_four_is_refused_while_duplication_remains(
+    service, adapter, tree, project
+):
+    """Deleting elements while duplication is hidden conceals it rather than removing it."""
+    _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
+    service.next_rule(str(project))
+    adapter.smells_by_rule = {Rule.DUPLICATION: ["2 statements repeat in `a`, `b`"]}
+
+    with pytest.raises(RefactorError, match="rules 2 and 3 have settled"):
+        service.next_rule(str(project))
+
+
+def test_advancing_to_rule_four_is_allowed_at_the_loop_fixpoint(
+    service, adapter, tree, project
+):
+    _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
+    service.next_rule(str(project))
+
+    assert service.next_rule(str(project)).rule is Rule.FEWEST_ELEMENTS
+
+
+def test_the_loop_reopens_when_duplication_work_creates_a_naming_target(
+    service, adapter, tree, project
+):
+    """The measured kata behaviour: deduping creates an abstraction needing a name."""
+    _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
+    service.next_rule(str(project))
+    adapter.smells_by_rule = {Rule.INTENTION: ["line 3: cryptic name `_f`"]}
+
+    report = service.rule_status(str(project))
+
+    assert "intention" in report.message
+    assert "loop" in report.message
+
+
+def test_rule_status_lists_every_rule_in_priority_order(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+
+    message = service.rule_status(str(project)).message
+
+    assert message.index("intention") < message.index("duplication")
+    assert message.index("duplication") < message.index("fewest_elements")
+
+
+def test_an_edit_that_trades_intention_for_less_duplication_is_reported(
+    service, adapter, tree, project
+):
+    """Extracting a cryptically named helper to kill duplication loses a higher rule."""
+    _to_refactoring(service, adapter, project)
+    adapter.smells_sequence = [
+        {Rule.DUPLICATION: ["2 statements repeat in `a`, `b`"]},
+        {Rule.INTENTION: ["line 3: cryptic name `_f`"]},
+    ]
+
+    report = service.edit_file(str(project), "invoice.code", "line one", "first line")
+
+    assert "outranks" in report.message
+    assert "intention" in report.message

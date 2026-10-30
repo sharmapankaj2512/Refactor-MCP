@@ -14,6 +14,7 @@ from refactor_mcp.server import (
     mcp,
     next_rule,
     refactor_status,
+    rule_status,
     run_tests,
     skip_rule,
     write_file,
@@ -296,3 +297,40 @@ def test_run_tests_narrows_to_a_single_test(repo: Path):
     report = run_tests(location, "test_invoice.py", "pins_current_behaviour")
 
     assert "1 passed" in report
+
+
+def test_rule_status_lists_the_rules_and_the_loop_state(repo: Path):
+    location = str(repo)
+    declare_scope(location, ["invoice.py"])
+    check_coverage(location)
+    write_file(location, "test_invoice.py", APPROVAL_TEST)
+    _commit_all(repo)
+
+    report = rule_status(location)
+
+    assert "rule 2 intention" in report
+    assert "rule 3 duplication" in report
+    assert "rule 4 fewest_elements" in report
+
+
+def test_rule_status_reports_the_loop_before_rule_four_opens(repo: Path):
+    """Rule 4 stays locked while rules 2 and 3 still have work."""
+    location = str(repo)
+    (repo / "invoice.py").write_text(
+        "def total(rows):\n    return sum(c for _, c in rows) * 1.175\n"
+    )
+    _commit_all(repo)
+    declare_scope(location, ["invoice.py"])
+    check_coverage(location)
+    write_file(
+        location,
+        "test_invoice.py",
+        "from invoice import total\n\n\ndef test_t():\n"
+        "    assert total([('a', 2)]) == 2.35\n",
+    )
+    _commit_all(repo)
+
+    report = rule_status(location)
+
+    assert "1.175" in report
+    assert "loop is still running" in report

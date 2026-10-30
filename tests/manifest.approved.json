@@ -107,6 +107,36 @@
         }
     },
     {
+        "description": "Show every rule of simple design, in priority order, and what it still sees.\n\nRules 2 (reveals intention) and 3 (no duplication) feed each other: naming a\nconcept exposes the duplication it hid, and removing duplication creates an\nabstraction that needs a name. They loop until both are clean at the same\nmoment, and only then does rule 4 (fewest elements) apply. Use this to see\nwhich rule has the highest-priority outstanding work.\n\nArgs:\n    location: Path to the project root.\n",
+        "input_schema": {
+            "properties": {
+                "location": {
+                    "title": "Location",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "location"
+            ],
+            "title": "rule_statusArguments",
+            "type": "object"
+        },
+        "name": "rule_status",
+        "output_schema": {
+            "properties": {
+                "result": {
+                    "title": "Result",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "result"
+            ],
+            "title": "rule_statusOutput",
+            "type": "object"
+        }
+    },
+    {
         "description": "Move to the next of Kent Beck's rules of simple design while refactoring.\n\nThe rules run in priority order: intention, then duplication, then fewest\nelements. Refuses while the tests fail, because rule 1 (passes all the\ntests) outranks every other rule.\n\nArgs:\n    location: Path to the project root.\n",
         "input_schema": {
             "properties": {
