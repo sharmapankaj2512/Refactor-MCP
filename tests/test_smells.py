@@ -149,3 +149,111 @@ def test_different_control_flow_is_not_duplication():
         "        return item\n"
     )
     assert find_python_smells(source, Rule.DUPLICATION) == []
+
+
+def test_feature_envy_is_reported_for_intention():
+    """A method that only ever touches its parameter belongs on that parameter."""
+    source = (
+        "class Shop:\n"
+        "    def _raise_quality(self, item):\n"
+        "        if item.quality < 50:\n"
+        "            item.quality += 1\n"
+    )
+    findings = _findings(source, Rule.INTENTION)
+    assert "_raise_quality" in findings
+    assert "item" in findings
+    assert "envy" in findings.lower()
+
+
+def test_a_method_using_its_own_state_is_not_feature_envy():
+    source = (
+        "class Shop:\n"
+        "    def total(self, item):\n"
+        "        return self.rate * item.price\n"
+    )
+    assert find_python_smells(source, Rule.INTENTION) == []
+
+
+def test_a_method_with_no_object_parameter_is_not_feature_envy():
+    source = "class Shop:\n    def reset(self):\n        self.count = 0\n"
+    assert find_python_smells(source, Rule.INTENTION) == []
+
+
+def test_a_predicate_on_a_parameter_is_still_feature_envy():
+    source = (
+        "class Shop:\n"
+        "    def _is_legendary(self, item):\n"
+        "        return item.name == SULFURAS\n"
+    )
+    assert "_is_legendary" in _findings(source, Rule.INTENTION)
+
+
+def test_primitive_obsession_is_reported_when_a_string_drives_branching():
+    """A str compared against three constants is a type wearing a disguise."""
+    source = (
+        "class Shop:\n"
+        "    def _update(self, item):\n"
+        "        if item.name == AGED_BRIE:\n"
+        "            return 1\n"
+        "        elif item.name == BACKSTAGE_PASS:\n"
+        "            return 2\n"
+        "        elif item.name == SULFURAS:\n"
+        "            return 3\n"
+        "        return 4\n"
+    )
+    findings = _findings(source, Rule.INTENTION)
+    assert "item.name" in findings
+    assert "primitive obsession" in findings.lower()
+
+
+def test_a_single_equality_check_is_not_primitive_obsession():
+    """One comparison is a condition; several against constants is a missing type."""
+    source = (
+        "class Shop:\n"
+        "    def _check(self, item):\n"
+        "        if item.name == SULFURAS:\n"
+        "            return self.rate\n"
+        "        return 2\n"
+    )
+    findings = _findings(source, Rule.INTENTION)
+    assert "primitive obsession" not in findings.lower()
+
+
+def test_shotgun_surgery_is_reported_when_one_attribute_is_written_everywhere():
+    """One concept edited in many places wants to own its own changes."""
+    source = (
+        "class Shop:\n"
+        "    def a(self, item):\n        item.quality += 1\n"
+        "    def b(self, item):\n        item.quality -= 1\n"
+        "    def c(self, item):\n        item.quality = 0\n"
+    )
+    findings = _findings(source, Rule.DUPLICATION)
+    assert "quality" in findings
+    assert "shotgun" in findings.lower()
+
+
+def test_an_attribute_written_in_one_place_is_not_shotgun_surgery():
+    source = "class Shop:\n    def a(self, item):\n        item.quality += 1\n"
+    assert find_python_smells(source, Rule.DUPLICATION) == []
+
+
+def test_a_comparison_against_a_plain_name_is_not_primitive_obsession():
+    """`x == A` three times is not a missing type; only an attribute of one object is."""
+    source = (
+        "class Shop:\n"
+        "    def pick(self, kind):\n"
+        "        if kind == A:\n            return self.a\n"
+        "        if kind == B:\n            return self.b\n"
+        "        if kind == C:\n            return self.c\n"
+    )
+    assert "primitive obsession" not in _findings(source, Rule.INTENTION).lower()
+
+
+def test_writes_to_a_plain_local_are_not_shotgun_surgery():
+    source = (
+        "class Shop:\n"
+        "    def a(self, item):\n        total = 1\n        return total + item.x\n"
+        "    def b(self, item):\n        total = 2\n        return total + item.x\n"
+        "    def c(self, item):\n        total = 3\n        return total + item.x\n"
+    )
+    assert "shotgun" not in _findings(source, Rule.DUPLICATION).lower()

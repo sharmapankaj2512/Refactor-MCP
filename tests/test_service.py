@@ -641,10 +641,10 @@ def test_next_rule_is_refused_when_the_rule_changed_nothing(service, adapter, pr
         service.next_rule(str(project))
 
 
-def test_next_rule_names_the_rules_targets_when_refusing(service, adapter, project):
+def test_next_rule_names_the_rules_smells_when_refusing(service, adapter, project):
     _to_refactoring(service, adapter, project)
 
-    with pytest.raises(RefactorError, match="Hunt:"):
+    with pytest.raises(RefactorError, match="feature envy"):
         service.next_rule(str(project))
 
 

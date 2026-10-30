@@ -65,7 +65,7 @@ def test_every_rule_names_itself_and_the_smells_to_hunt():
     for rule in Rule:
         guidance = RULE_GUIDANCE[rule]
         assert rule.value.replace("_", " ") in guidance.lower()
-        assert "Hunt:" in guidance
+        assert "hunt" in guidance.lower()
         assert "Next:" in guidance
 
 
@@ -198,3 +198,21 @@ def test_next_rule(rule, expected):
 
 def test_the_rules_run_in_kent_becks_priority_order():
     assert list(Rule) == [Rule.INTENTION, Rule.DUPLICATION, Rule.FEWEST_ELEMENTS]
+
+
+@pytest.mark.parametrize(
+    ("rule", "smell"),
+    [
+        (Rule.INTENTION, "feature envy"),
+        (Rule.INTENTION, "primitive obsession"),
+        (Rule.DUPLICATION, "shotgun surgery"),
+    ],
+)
+def test_guidance_names_the_smells_the_detector_can_find(rule, smell):
+    """Guidance that names only undetectable smells reads as boilerplate to skim."""
+    assert smell in RULE_GUIDANCE[rule].lower()
+
+
+def test_intention_warns_that_extracting_methods_is_not_enough():
+    """The failure mode this server hit: small methods that all poke one object."""
+    assert "not enough" in RULE_GUIDANCE[Rule.INTENTION].lower()

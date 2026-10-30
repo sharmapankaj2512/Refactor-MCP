@@ -11,6 +11,8 @@ MAX_FINDINGS = 5
 LONG_METHOD_STATEMENTS = 12
 READABLE_NUMBERS = frozenset({0, 1, 2, -1, -2, 100})
 MIN_NAME_LENGTH = 3
+BRANCHING_COMPARISONS = 3
+SCATTERED_WRITES = 3
 SEQUENCE_LENGTH = 2
 # Short names that are conventional rather than cryptic.
 IDIOMATIC_NAMES = frozenset({"self", "cls", "n", "i", "j", "k", "x", "y", "z", "_"})
@@ -27,7 +29,58 @@ def find_python_smells(source: str, rule: Rule) -> list[str]:
 
 
 def _intention(tree: ast.AST) -> list[str]:
-    return _long_methods(tree) + _magic_numbers(tree) + _cryptic_names(tree)
+    return (
+        _feature_envy(tree)
+        + _primitive_obsession(tree)
+        + _long_methods(tree)
+        + _magic_numbers(tree)
+        + _cryptic_names(tree)
+    )
+
+
+def _feature_envy(tree: ast.AST) -> list[str]:
+    """Methods that only ever touch one parameter: the behaviour belongs on it."""
+    findings = []
+    for node in _methods(tree):
+        parameters = [a.arg for a in node.args.args[1:]]
+        if not parameters:
+            continue
+        touched = {
+            value.value.id
+            for value in ast.walk(node)
+            if isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name)
+        }
+        envied = [name for name in parameters if name in touched]
+        if len(touched) == 1 and envied and "self" not in touched:
+            findings.append(
+                f"line {node.lineno}: `{node.name}` only touches `{envied[0]}` — "
+                f"feature envy: move it onto {envied[0]}"
+            )
+    return findings
+
+
+def _primitive_obsession(tree: ast.AST) -> list[str]:
+    """A primitive compared against several constants is a type in disguise."""
+    compared: dict[str, list[int]] = defaultdict(list)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or not _is_equality(node):
+            continue
+        if isinstance(node.left, ast.Attribute) and isinstance(
+            node.left.value, ast.Name
+        ):
+            name = f"{node.left.value.id}.{node.left.attr}"
+            compared[name].append(node.lineno)
+    return [
+        f"line {lines[0]}: `{name}` is compared against "
+        f"{len(lines)} constants — primitive obsession: give the concept its "
+        "own type and let it answer for itself"
+        for name, lines in compared.items()
+        if len(lines) >= BRANCHING_COMPARISONS
+    ]
+
+
+def _is_equality(node: ast.Compare) -> bool:
+    return any(isinstance(op, ast.Eq | ast.NotEq) for op in node.ops)
 
 
 def _long_methods(tree: ast.AST) -> list[str]:
@@ -79,6 +132,51 @@ def _cryptic_names(tree: ast.AST) -> list[str]:
 
 
 def _duplication(tree: ast.AST) -> list[str]:
+    return _shotgun_surgery(tree) + _repeated_sequences(tree)
+
+
+def _shotgun_surgery(tree: ast.AST) -> list[str]:
+    """One attribute written from many places: the concept should own its changes."""
+    written: dict[str, set[str]] = defaultdict(set)
+    for node in _methods(tree):
+        for assigned in ast.walk(node):
+            targets = _written_targets(assigned)
+            for target in targets:
+                if isinstance(target, ast.Attribute) and isinstance(
+                    target.value, ast.Name
+                ):
+                    written[f"{target.value.id}.{target.attr}"].add(node.name)
+    return [
+        f"`{name}` is written from {len(places)} methods "
+        f"({', '.join(f'`{place}`' for place in sorted(places))}) — "
+        "shotgun surgery: let it own its own changes"
+        for name, places in written.items()
+        if len(places) >= SCATTERED_WRITES
+    ]
+
+
+def _written_targets(node: ast.AST) -> list[ast.expr]:
+    if isinstance(node, ast.Assign):
+        return list(node.targets)
+    if isinstance(node, ast.AugAssign):
+        return [node.target]
+    return []
+
+
+def _methods(tree: ast.AST) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+    """Functions defined directly inside a class."""
+    methods = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            methods += [
+                child
+                for child in node.body
+                if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+            ]
+    return methods
+
+
+def _repeated_sequences(tree: ast.AST) -> list[str]:
     windows: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for node in _functions(tree):
         body = node.body

@@ -70,6 +70,13 @@ around it.
   `write_file`/`edit_file` trigger move the workflow.
 - **Coverage includes branches.** An `if` whose false path no test takes counts
   as uncovered, so the approval test may need more than one case.
+- **Extracting methods is not revealing intention.** If every new method takes
+  the same parameter and touches only that parameter, you have relabelled
+  procedural code: that is feature envy, and the behaviour belongs on the data.
+  Check `rule_status` after an extraction — it will say so.
+- **A string driving a branch is a missing type.** Comparing one attribute
+  against three constants is primitive obsession; give the concept a type and
+  let it answer for itself.
 - **Advancing a rule is not applying it.** Calling `next_rule` three times in a
   row leaves the refactoring unfinished; the server now refuses this, but the
   habit is the thing to avoid. Read the targets it lists and fix them.
