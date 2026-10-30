@@ -241,7 +241,9 @@ class RefactorService:
         session.rule_base = self._history.head_commit(root) if self._history else ""
 
     def _require_work(self, session: _Session, root: Path) -> None:
-        """A rule that changed nothing is a rule nobody applied."""
+        """A rule that changed nothing is a rule nobody applied, unless it was skipped."""
+        if session.rule in session.skipped:
+            return
         if self._rule_changed_production(session, root):
             return
         raise RefactorError(

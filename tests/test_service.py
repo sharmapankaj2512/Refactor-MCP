@@ -737,3 +737,27 @@ def test_smells_skip_a_scope_file_that_no_longer_exists(
     tree.changes = [" D invoice.code"]
 
     assert service.next_rule(str(project)).rule is Rule.DUPLICATION
+
+
+def test_completing_accepts_a_rule_that_was_skipped_with_a_reason(
+    service, adapter, history, project
+):
+    """A skip must satisfy the gate, or the escape hatch leaves no way out."""
+    _to_refactoring(service, adapter, project)
+    _worked(service, project, history, "line one", "first line")
+    service.next_rule(str(project))
+    service.skip_rule(str(project), "no duplication in a two line file")
+    service.skip_rule(str(project), "nothing dead to delete in two lines")
+
+    report = service.complete_refactoring(str(project))
+
+    assert report.phase is Phase.SCOPE_REQUIRED
+
+
+def test_advancing_past_a_skipped_rule_needs_no_edit(service, adapter, project):
+    _to_refactoring(service, adapter, project)
+    service.skip_rule(str(project), "names already reveal intent here")
+
+    assert service.skip_rule(str(project), "no duplication in two lines").rule is (
+        Rule.FEWEST_ELEMENTS
+    )
