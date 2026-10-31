@@ -1,0 +1,533 @@
+<title>Refactoring Workflow States</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ink: #11161c;
+    --ink-soft: #3d454f;
+    --ground: #f7f6f3;
+    --surface: #fffefc;
+    --rule: #ddd9d2;
+    --rust: #b4531f;
+    --rust-soft: #f2e3d8;
+    --moss: #3f6b52;
+    --moss-soft: #dfe9e2;
+    --slate: #6b7480;
+    --locked: #eceae6;
+    --display: "Fraunces", Georgia, serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae6;
+      --ink-soft: #b2b7be;
+      --ground: #12161a;
+      --surface: #191e23;
+      --rule: #2d343b;
+      --rust: #e08b55;
+      --rust-soft: #3a2619;
+      --moss: #85b89a;
+      --moss-soft: #1e2c24;
+      --slate: #8b939d;
+      --locked: #21262c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae6;
+    --ink-soft: #b2b7be;
+    --ground: #12161a;
+    --surface: #191e23;
+    --rule: #2d343b;
+    --rust: #e08b55;
+    --rust-soft: #3a2619;
+    --moss: #85b89a;
+    --moss-soft: #1e2c24;
+    --slate: #8b939d;
+    --locked: #21262c;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 3.5rem 5rem;
+  }
+  header { margin-bottom: 3rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin: 0 0 0.9rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 38rem;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 3.5rem 0 0.4rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--rule);
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 2rem 0 0.5rem;
+  }
+  p { margin: 0 0 1rem; max-width: 42rem; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--locked);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  .lede { color: var(--ink-soft); margin-bottom: 1.6rem; }
+
+  /* Phase ladder: the four states, with what each locks. */
+  .ladder { display: grid; gap: 0.6rem; margin: 1.8rem 0 2rem; }
+  .phase {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--slate);
+    border-radius: 2px;
+    padding: 0.9rem 1rem;
+  }
+  .phase[data-open="prod"] { border-left-color: var(--moss); }
+  .rank {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--slate);
+    padding-top: 0.15rem;
+  }
+  .phase-name {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.3rem;
+  }
+  .phase-note { font-size: 0.9rem; color: var(--ink-soft); margin: 0 0 0.6rem; }
+  .perms { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .perm {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    padding: 0.18rem 0.45rem;
+    border-radius: 2px;
+    background: var(--locked);
+    color: var(--slate);
+  }
+  .perm[data-state="writable"] { background: var(--moss-soft); color: var(--moss); }
+  .perm[data-state="locked"]::before { content: "× "; }
+  .perm[data-state="writable"]::before { content: "✓ "; }
+
+  figure {
+    margin: 1.8rem 0 2rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1.2rem 0.6rem 0.4rem;
+  }
+  figure > .scroll { overflow-x: auto; }
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--slate);
+    padding: 0.6rem 0.8rem 0.4rem;
+    border-top: 1px solid var(--rule);
+    margin-top: 0.8rem;
+  }
+  pre.mermaid { margin: 0; text-align: center; min-width: 30rem; }
+
+  /* The loop measurement, as the real recorded numbers. */
+  .scroll-table { overflow-x: auto; margin: 1.6rem 0 2rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 34rem; }
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slate);
+    font-weight: 500;
+  }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  td.sha { font-family: var(--mono); font-size: 0.8rem; color: var(--slate); }
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 0.14rem 0.4rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .tag[data-v="running"] { background: var(--rust-soft); color: var(--rust); }
+  .tag[data-v="settled"] { background: var(--moss-soft); color: var(--moss); }
+  .tag[data-v="locked"] { background: var(--locked); color: var(--slate); }
+
+  /* Gate order: the sequence is load-bearing, so it is numbered. */
+  ol.gates { counter-reset: g; list-style: none; padding: 0; margin: 1.6rem 0 2rem; }
+  ol.gates > li {
+    counter-increment: g;
+    display: grid;
+    grid-template-columns: 1.7rem 1fr;
+    gap: 0.9rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  ol.gates > li::before {
+    content: counter(g);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--rust);
+    padding-top: 0.2rem;
+  }
+  ol.gates strong { font-family: var(--mono); font-size: 0.9rem; font-weight: 600; }
+  ol.gates span { display: block; font-size: 0.9rem; color: var(--ink-soft); }
+
+  .callout {
+    background: var(--rust-soft);
+    border-left: 3px solid var(--rust);
+    padding: 1rem 1.1rem;
+    margin: 1.8rem 0;
+    border-radius: 0 2px 2px 0;
+  }
+  .callout p { margin: 0; max-width: none; font-size: 0.94rem; }
+  .callout strong { color: var(--rust); }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.84rem;
+    color: var(--slate);
+  }
+  footer p { max-width: none; }
+  nav.pair { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+  nav.pair a {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--rust);
+    text-decoration: none;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.35rem 0.6rem;
+  }
+  nav.pair a:hover, nav.pair a:focus-visible { border-color: var(--rust); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Refactor-MCP · workflow model</p>
+    <h1>How the refactoring workflow decides what you may write</h1>
+    <p class="standfirst">
+      Four phases, a write-permission table, and a loop between two of Kent Beck's
+      rules of simple design. Every rule below is enforced in
+      <code>phases.py</code> and <code>simple_design.py</code> — this page is a
+      reading of that code, not a wish list.
+    </p>
+  </header>
+
+  <h2>The premise</h2>
+  <p class="lede">
+    Refactoring means changing structure without changing behaviour. You cannot
+    know you preserved behaviour that nothing measures, so production code stays
+    locked until every line <em>and branch</em> in the declared scope is covered.
+    That single rule is why the server exists; everything else follows from it.
+  </p>
+
+  <h2>Four phases</h2>
+  <p>
+    A phase is a set of write permissions. The server classifies each file as a
+    test, production code, an approved baseline, or something else, then consults
+    one table. Nothing else grants access.
+  </p>
+
+  <div class="ladder">
+    <div class="phase">
+      <span class="rank">01</span>
+      <div>
+        <p class="phase-name">scope_required</p>
+        <p class="phase-note">No session yet. <code>declare_scope</code> names the production files to refactor; folders expand to the production files inside them, so a scope of only tests is refused.</p>
+        <div class="perms">
+          <span class="perm" data-state="locked">test</span>
+          <span class="perm" data-state="locked">production</span>
+          <span class="perm" data-state="locked">approved</span>
+          <span class="perm" data-state="writable">other</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase">
+      <span class="rank">02</span>
+      <div>
+        <p class="phase-name">coverage_check</p>
+        <p class="phase-note">Scope declared, nothing measured. <code>check_coverage</code> runs the whole suite with branch coverage and routes on the result.</p>
+        <div class="perms">
+          <span class="perm" data-state="locked">test</span>
+          <span class="perm" data-state="locked">production</span>
+          <span class="perm" data-state="locked">approved</span>
+          <span class="perm" data-state="writable">other</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase">
+      <span class="rank">03</span>
+      <div>
+        <p class="phase-name">approval_tests</p>
+        <p class="phase-note">Behaviour is not yet pinned. Write one test that records what the scope does <em>today</em> — bugs included. Production code stays locked; retrying will not help.</p>
+        <div class="perms">
+          <span class="perm" data-state="writable">test</span>
+          <span class="perm" data-state="locked">production</span>
+          <span class="perm" data-state="writable">approved</span>
+          <span class="perm" data-state="writable">other</span>
+        </div>
+      </div>
+    </div>
+    <div class="phase" data-open="prod">
+      <span class="rank">04</span>
+      <div>
+        <p class="phase-name">refactoring</p>
+        <p class="phase-note">Behaviour is pinned, so structure may move. Baselines are now locked — rewriting one is the only way to make a changed behaviour look green.</p>
+        <div class="perms">
+          <span class="perm" data-state="writable">test</span>
+          <span class="perm" data-state="writable">production</span>
+          <span class="perm" data-state="locked">approved</span>
+          <span class="perm" data-state="writable">other</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> scope_required
+    scope_required --> coverage_check: declare_scope
+    coverage_check --> refactoring: check_coverage<br/>scope fully covered
+    coverage_check --> approval_tests: check_coverage<br/>uncovered, or suite red
+    approval_tests --> refactoring: a test write passes<br/>and covers the scope
+    approval_tests --> approval_tests: test fails, or gaps remain
+    refactoring --> refactoring: edit keeps tests green<br/>(else reverted)
+    refactoring --> scope_required: complete_refactoring
+</pre>
+    </div>
+    <figcaption>
+      Phase transitions. Only <code>check_coverage</code> and the test runs that
+      <code>write_file</code> / <code>edit_file</code> trigger move the workflow;
+      <code>run_tests</code> never does.
+    </figcaption>
+  </figure>
+
+  <div class="callout">
+    <p>
+      <strong>Covered means measured and gapless.</strong> A file no test imports
+      has no uncovered lines, so it looks identical to a fully covered file — it is
+      simply absent from the report. The server therefore requires every scope file
+      to <em>appear</em> in the coverage report as well as have no missing lines or
+      branches. An unrelated passing test proves nothing.
+    </p>
+  </div>
+
+  <h2>Rules 2 and 3 are a loop</h2>
+  <p>
+    Inside <code>refactoring</code>, Kent Beck's rules are a priority order
+    consulted at every decision — not a pipeline you pass through once. Among
+    designs that pass the tests, prefer the one that reveals intention; among
+    those, the one without duplication; among those, the one with fewest elements.
+  </p>
+  <p>
+    Rules 2 and 3 <em>feed each other</em>. Naming a concept exposes the
+    duplication it was hiding; removing duplication creates an abstraction that
+    needs a name. So they iterate until both are clean at the same moment — and
+    only then does rule 4 apply, because deleting elements while duplication
+    remains hides it rather than removing it.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+flowchart TD
+    E[enter refactoring] --> I
+    I["rule 2 · reveals intention<br/>anaemic model, feature envy,<br/>primitive obsession, long methods"]
+    D["rule 3 · no duplication<br/>repeated sequences,<br/>shotgun surgery"]
+    I -- "naming exposes<br/>hidden duplication" --> D
+    D -- "deduping creates<br/>something to name" --> I
+    I -. "both clean<br/>at once" .-> F{fixpoint}
+    D -. "both clean<br/>at once" .-> F
+    F --> X["rule 4 · fewest elements<br/>dead code, needless indirection"]
+    X -- "a deletion reveals<br/>a new target" --> I
+    X --> C[complete_refactoring]
+    R["rule 1 · passes all the tests<br/>always on — a breaking edit is reverted"]
+</pre>
+    </div>
+    <figcaption>
+      Rule 1 is not a step. It is the standing invariant: any write that breaks the
+      suite is reverted automatically, in every rule.
+    </figcaption>
+  </figure>
+
+  <h3>The loop, measured</h3>
+  <p>
+    Target counts taken from the detector at each commit of one Gilded Rose run.
+    Intention clears, and in the same step duplication <em>appears</em> — the
+    extraction exposed what the long method was hiding.
+  </p>
+
+  <div class="scroll-table">
+    <table>
+      <thead>
+        <tr><th>commit</th><th>refactoring</th><th>intention</th><th>duplication</th><th>loop</th><th>rule 4</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="sha">8fd6ee7</td><td>Name the item types</td>
+          <td class="n">1</td><td class="n">0</td>
+          <td><span class="tag" data-v="running">running</span></td>
+          <td><span class="tag" data-v="locked">locked</span></td>
+        </tr>
+        <tr>
+          <td class="sha">5b89c59</td><td>Extract a method per item type</td>
+          <td class="n">0</td><td class="n">1</td>
+          <td><span class="tag" data-v="running">running</span></td>
+          <td><span class="tag" data-v="locked">locked</span></td>
+        </tr>
+        <tr>
+          <td class="sha">61d327a</td><td>Share the day-advance step</td>
+          <td class="n">0</td><td class="n">0</td>
+          <td><span class="tag" data-v="settled">settled</span></td>
+          <td><span class="tag" data-v="settled">open</span></td>
+        </tr>
+        <tr>
+          <td class="sha">6e4be13</td><td>Drop the redundant base class</td>
+          <td class="n">0</td><td class="n">0</td>
+          <td><span class="tag" data-v="settled">settled</span></td>
+          <td><span class="tag" data-v="settled">open</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>A rule that changed nothing was not applied</h2>
+  <p>
+    <code>next_rule</code> and <code>complete_refactoring</code> refuse while the
+    current rule has touched no production code in the scope. A counter you can
+    advance for free is not a workflow — and that was a real bug: three
+    <code>next_rule</code> calls with zero edits once reached completion with two
+    rules untouched.
+  </p>
+  <p>
+    Deletions count. The gate asks <code>changed_paths</code>, not changed lines,
+    because rule 4's whole job is removing code — a pure deletion produces no
+    added lines and would otherwise read as no work at all.
+  </p>
+  <p>
+    When the code genuinely satisfies a rule already,
+    <code>skip_rule(reason)</code> records why. The reason is echoed in every later
+    reply and in the completion summary, so an honest skip stays possible but
+    becomes visible rather than silent.
+  </p>
+
+  <h2>What happens on a write</h2>
+  <p>
+    Each gate runs in this order, and the order matters: a file that is both locked
+    <em>and</em> sitting on an uncommitted step reports the lock first, because
+    committing would not unlock it and the other message sends an agent in circles.
+  </p>
+
+  <ol class="gates">
+    <li><strong>resolve_inside(root, path)</strong><span>Refuse anything outside the project root — <code>..</code>, absolute paths and symlink escapes alike.</span></li>
+    <li><strong>classify(path)</strong><span>Test, production, approved baseline, or other. A name containing <code>.approved.</code> is a baseline in any language.</span></li>
+    <li><strong>exempt?</strong><span>Paths matching <code>REFACTOR_MCP_EXEMPT</code> are written with no test run at all.</span></li>
+    <li><strong>open step?</strong><span>A dirty tree with no open step means an earlier step is uncommitted. Repeat edits within one step amend it.</span></li>
+    <li><strong>may_write(phase, kind)</strong><span>The permission table. This is where a production write in <code>approval_tests</code> dies.</span></li>
+    <li><strong>snapshot, then write</strong><span>The previous bytes are kept so the write can be undone.</span></li>
+    <li><strong>run the suite</strong><span>Non-code files return here without running anything.</span></li>
+    <li><strong>transition, or revert</strong><span>Tests red, a test added during refactoring, or a touched baseline — the snapshot is restored and the reply says what was undone and why.</span></li>
+  </ol>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+flowchart TD
+    W["write_file / edit_file"] --> P{inside root?}
+    P -- no --> X1["refuse: outside the project root"]
+    P -- yes --> K[classify the file]
+    K --> E{exempt path?}
+    E -- yes --> Z1["write, no test run"]
+    E -- no --> S{dirty tree,<br/>no open step?}
+    S -- yes --> X2["refuse: commit the<br/>previous step first"]
+    S -- no --> M{may_write<br/>phase, kind?}
+    M -- no --> X3["refuse: locked in<br/>this phase"]
+    M -- yes --> SN[snapshot the file] --> WR[write] --> T{code file?}
+    T -- no --> Z2["wrote it, no test run"]
+    T -- yes --> RUN[run the suite] --> V{green, and<br/>no test added?}
+    V -- no --> RV["restore the snapshot<br/>· reverted"]
+    V -- yes --> OK[accept, advance the phase]
+</pre>
+    </div>
+    <figcaption>
+      The write gate. Eight checks, in order; the first failure answers, and every
+      refusal names the tool call that gets you unstuck.
+    </figcaption>
+  </figure>
+
+  <h2>What the state machine cannot tell you</h2>
+  <p>
+    A clean result means no <em>detectable</em> smells remain, which is not the
+    same as a good design. The detector cannot see misplaced responsibility, a
+    wrong abstraction, or a model that is merely procedural code with better
+    labels. <code>complete_refactoring</code> says so in its own summary.
+  </p>
+  <p>
+    Every smell detector in this server exists because a human read the refactored
+    code and judged it unfinished while the server reported "satisfied" — feature
+    envy, primitive obsession and shotgun surgery came from one such reading, the
+    anaemic-model detector from the next. The tool narrows what you have to look
+    for. It does not replace looking.
+  </p>
+
+  <footer>
+    <p>
+      Enforced in <code>src/refactor_mcp/phases.py</code> (states and permissions),
+      <code>simple_design.py</code> (the rule loop) and <code>service.py</code>
+      (the gates). Diagrams render via the Artifact runtime's native Mermaid.
+    </p>
+    <nav class="pair">
+      <a href="./interactions.html">Interaction sequences →</a>
+    </nav>
+  </footer>
+</div>

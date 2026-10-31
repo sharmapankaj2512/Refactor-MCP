@@ -1,0 +1,599 @@
+<title>Refactor-MCP Interaction Sequences</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ink: #11161c;
+    --ink-soft: #3d454f;
+    --ground: #f7f6f3;
+    --surface: #fffefc;
+    --rule: #ddd9d2;
+    --rust: #b4531f;
+    --rust-soft: #f2e3d8;
+    --moss: #3f6b52;
+    --moss-soft: #dfe9e2;
+    --slate: #6b7480;
+    --locked: #eceae6;
+    --display: "Fraunces", Georgia, serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae6;
+      --ink-soft: #b2b7be;
+      --ground: #12161a;
+      --surface: #191e23;
+      --rule: #2d343b;
+      --rust: #e08b55;
+      --rust-soft: #3a2619;
+      --moss: #85b89a;
+      --moss-soft: #1e2c24;
+      --slate: #8b939d;
+      --locked: #21262c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae6;
+    --ink-soft: #b2b7be;
+    --ground: #12161a;
+    --surface: #191e23;
+    --rule: #2d343b;
+    --rust: #e08b55;
+    --rust-soft: #3a2619;
+    --moss: #85b89a;
+    --moss-soft: #1e2c24;
+    --slate: #8b939d;
+    --locked: #21262c;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 3.5rem 5rem;
+  }
+  header { margin-bottom: 3rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin: 0 0 0.9rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 38rem;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 3.5rem 0 0.4rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--rule);
+    text-wrap: balance;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--rust);
+    display: block;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.3rem;
+  }
+  h3 { font-size: 1rem; font-weight: 600; margin: 2rem 0 0.5rem; }
+  p { margin: 0 0 1rem; max-width: 42rem; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--locked);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  .lede { color: var(--ink-soft); margin-bottom: 1.6rem; }
+
+  /* The four participants, named once so every diagram reads consistently. */
+  .cast { display: grid; gap: 0.5rem; margin: 1.8rem 0 2.5rem; }
+  .actor {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .actor-name {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--rust);
+  }
+  .actor-role { font-size: 0.92rem; color: var(--ink-soft); }
+  @media (max-width: 30rem) {
+    .actor { grid-template-columns: 1fr; gap: 0.15rem; }
+  }
+
+  figure {
+    margin: 1.6rem 0 2rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1.2rem 0.6rem 0.4rem;
+  }
+  figure > .scroll { overflow-x: auto; }
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--slate);
+    padding: 0.6rem 0.8rem 0.4rem;
+    border-top: 1px solid var(--rule);
+    margin-top: 0.8rem;
+  }
+  pre.mermaid { margin: 0; text-align: center; min-width: 32rem; }
+
+  pre.frame {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--slate);
+    border-radius: 2px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    margin: 1.2rem 0 1.8rem;
+  }
+  pre.frame b { color: var(--rust); font-weight: 600; }
+  pre.frame i { color: var(--slate); font-style: normal; }
+
+  .callout {
+    background: var(--rust-soft);
+    border-left: 3px solid var(--rust);
+    padding: 1rem 1.1rem;
+    margin: 1.8rem 0;
+    border-radius: 0 2px 2px 0;
+  }
+  .callout.good { background: var(--moss-soft); border-left-color: var(--moss); }
+  .callout p { margin: 0; max-width: none; font-size: 0.94rem; }
+  .callout p + p { margin-top: 0.6rem; }
+  .callout strong { color: var(--rust); }
+  .callout.good strong { color: var(--moss); }
+
+  .scroll-table { overflow-x: auto; margin: 1.6rem 0 2rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--rule); }
+  th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slate);
+    font-weight: 500;
+  }
+  td.cmd { font-family: var(--mono); font-size: 0.8rem; }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.84rem;
+    color: var(--slate);
+  }
+  footer p { max-width: none; }
+  nav.pair { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+  nav.pair a {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--rust);
+    text-decoration: none;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.35rem 0.6rem;
+  }
+  nav.pair a:hover, nav.pair a:focus-visible { border-color: var(--rust); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Refactor-MCP · interaction sequences</p>
+    <h1>Who talks to whom, and in what order</h1>
+    <p class="standfirst">
+      Seven sequences tracing a refactoring from the agent's tool call through the
+      MCP server to the file system, git, and the test runner — including the
+      exchanges where the server says no.
+    </p>
+  </header>
+
+  <h2>The cast</h2>
+  <p class="lede">
+    Four participants appear in every diagram. The server holds no durable state of
+    its own: workflow state lives in memory keyed by project root, and git is the
+    source of truth it recomputes from.
+  </p>
+
+  <div class="cast">
+    <div class="actor">
+      <span class="actor-name">Claude Code</span>
+      <span class="actor-role">The MCP client. Spawns the server as a subprocess and speaks JSON-RPC 2.0 over its stdin/stdout.</span>
+    </div>
+    <div class="actor">
+      <span class="actor-name">refactor-mcp</span>
+      <span class="actor-role">A Python process. Gates every write, runs the suite, keeps phase and rule state in memory per project root.</span>
+    </div>
+    <div class="actor">
+      <span class="actor-name">file system</span>
+      <span class="actor-role">The target project, confined to one root. Writes are snapshotted so they can be undone.</span>
+    </div>
+    <div class="actor">
+      <span class="actor-name">git + pytest</span>
+      <span class="actor-role">Subprocesses. Git answers "what changed and is it committed"; pytest answers "does it still pass, and what is covered".</span>
+    </div>
+  </div>
+
+  <h2><span class="num">Sequence 01</span>Startup and handshake</h2>
+  <p>
+    The server is not a daemon. Claude Code launches it per session from
+    <code>.mcp.json</code> and keeps the pipe open; when the session ends, the
+    process ends and all workflow state goes with it.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    CC->>S: spawn mise -C {dir} run run (stdio)
+    CC->>S: initialize { protocolVersion, clientInfo }
+    S-->>CC: serverInfo "refactoring" + instructions (2.1 KB)
+    CC->>S: notifications/initialized
+    CC->>S: tools/list
+    S-->>CC: 10 tools with JSON schemas
+    Note over CC,S: the `language` enum is generated from the<br/>adapter registry, so it cannot drift
+</pre>
+    </div>
+    <figcaption>
+      The <code>instructions</code> string is the server's system prompt: it states
+      the whole workflow, so an agent knows the rules before its first call.
+    </figcaption>
+  </figure>
+
+<pre class="frame"><i>// what actually crosses the pipe, one JSON object per line</i>
+<b>→</b> {"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+     "protocolVersion":"2024-11-05","clientInfo":{"name":"claude-code"}}}
+<b>←</b> {"jsonrpc":"2.0","id":1,"result":{
+     "serverInfo":{"name":"refactoring"},"instructions":"Enforces a safe…"}}
+<b>→</b> {"jsonrpc":"2.0","method":"notifications/initialized"}
+<b>→</b> {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+     "name":"declare_scope","arguments":{"location":"/path","paths":["invoice.py"]}}}
+<b>←</b> {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text",
+     "text":"Phase: coverage_check\nScope declared: invoice.py. …"}]}}</pre>
+
+  <h2><span class="num">Sequence 02</span>Declaring a scope, then measuring it</h2>
+  <p>
+    <code>declare_scope</code> only touches the file system to expand folders and
+    classify files. The measurement happens in <code>check_coverage</code>, which
+    is the tool that decides whether production code unlocks at all.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    participant FS as file system
+    participant G as git + pytest
+    CC->>S: declare_scope(location, paths)
+    S->>FS: resolve_inside + rglob, classify each file
+    FS-->>S: production files in scope
+    Note over S: refuse if the scope holds no production code
+    S->>G: git rev-parse HEAD
+    G-->>S: base commit for this scope
+    S-->>CC: Phase: coverage_check
+
+    CC->>S: check_coverage(location)
+    S->>G: pytest --cov --cov-branch --junitxml=… (temp dir)
+    G-->>S: outcome · uncovered lines · measured files
+    alt suite red
+        S-->>CC: Phase: approval_tests — the suite must pass first
+    else gaps in scope, or a scope file unmeasured
+        S-->>CC: Phase: approval_tests + the exact missing lines
+    else fully covered
+        S->>G: git rev-parse HEAD (pin rule_base)
+        S-->>CC: Phase: refactoring · Rule: intention
+    end
+</pre>
+    </div>
+    <figcaption>
+      Coverage reports are written to a temp directory, so measuring never dirties
+      the working tree — which matters because a dirty tree is itself a gate.
+    </figcaption>
+  </figure>
+
+  <h2><span class="num">Sequence 03</span>A write that is refused</h2>
+  <p>
+    The central guarantee, as a message exchange: production code is locked until
+    behaviour is pinned. Nothing reaches the file system — no snapshot, no write,
+    no test run.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    participant FS as file system
+    CC->>S: write_file("invoice.py", refactored)
+    S->>S: classify → production
+    S->>S: may_write(approval_tests, production) → false
+    S--xFS: nothing written
+    S-->>CC: ToolError — "Writing production files is not allowed<br/>in the approval_tests phase. Next: write ONE<br/>approval test that pins the scope's behaviour."
+    Note over CC,S: every refusal names the tool call that unsticks it
+</pre>
+    </div>
+    <figcaption>
+      Domain errors subclass <code>ValueError</code> and are translated to
+      <code>ToolError</code> by one context manager — without it the SDK discards
+      the message text and the agent sees an empty error.
+    </figcaption>
+  </figure>
+
+  <h2><span class="num">Sequence 04</span>Pinning behaviour with an approval test</h2>
+  <p>
+    A test write is graded, not just accepted: the suite must pass <em>and</em> the
+    scope must end up fully covered. That is two subprocess runs — the suite, then
+    coverage — because passing is not the same as covering.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    participant FS as file system
+    participant G as git + pytest
+    CC->>S: write_file("tests/test_invoice.py", approval test)
+    S->>G: git status --porcelain
+    G-->>S: clean → this edit opens a new step
+    S->>FS: snapshot, then write
+    S->>G: pytest (no coverage)
+    G-->>S: passed
+    S->>G: pytest --cov --cov-branch
+    G-->>S: uncovered + measured files
+    alt scope now fully covered
+        S-->>CC: Phase: refactoring · Rule: intention
+    else gaps remain
+        S-->>CC: Phase: approval_tests — "Still uncovered: invoice.py: 2, 4"
+    end
+</pre>
+    </div>
+    <figcaption>
+      Branch coverage is included, so an <code>if</code> whose false path no test
+      takes counts as uncovered — which is why one approval test often needs
+      several cases.
+    </figcaption>
+  </figure>
+
+  <h2><span class="num">Sequence 05</span>A refactoring that breaks behaviour</h2>
+  <p>
+    Rule 1 — passes all the tests — is enforced here, by undoing the edit rather
+    than warning about it. The snapshot taken before the write is what makes that
+    possible.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    participant FS as file system
+    participant G as pytest
+    CC->>S: edit_file("invoice.py", old, new)
+    S->>FS: snapshot (previous bytes kept)
+    S->>FS: apply the edit
+    S->>G: pytest
+    G-->>S: FAILED — approved output differs
+    S->>FS: restore(snapshot)
+    FS-->>S: file back to its previous bytes
+    S-->>CC: "A refactoring must keep the tests passing, so this<br/>edit was undone. Make a smaller change: one<br/>rename, one extraction, one move."
+</pre>
+    </div>
+    <figcaption>
+      The same path reverts an edit that adds a test (new behaviour belongs in a
+      TDD cycle) and refuses one that touches an <code>.approved.*</code> baseline.
+    </figcaption>
+  </figure>
+
+  <div class="callout">
+    <p>
+      <strong>Why the baseline is locked while refactoring.</strong> Rewriting an
+      approved file is the one way to make a changed behaviour look green. The
+      server refuses it outright and says where a real behaviour change belongs — a
+      test-driven cycle, not this one.
+    </p>
+  </div>
+
+  <h2><span class="num">Sequence 06</span>Working a rule, and the loop reopening</h2>
+  <p>
+    After an accepted write the server re-measures the scope and compares target
+    counts before and after. That is how it notices both the loop feeding forward
+    and an edit that bought a lower-ranked rule by spending a higher one.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    participant FS as file system
+    participant G as git + pytest
+    CC->>S: rule_status(location)
+    S->>FS: read each scope file
+    S->>S: find_smells(source, rule) per rule
+    S-->>CC: rule 2 outstanding (5 targets) · rule 3 satisfied<br/>loop running · rule 4 LOCKED
+
+    CC->>S: write_file("invoice.py", extracted methods)
+    S->>S: measure targets BEFORE
+    S->>FS: snapshot + write
+    S->>G: pytest → passed
+    S->>S: measure targets AFTER
+    Note over S: intention 1→0, duplication 0→1<br/>the extraction exposed hidden duplication
+    S-->>CC: accepted · highest outstanding rule: duplication
+
+    CC->>S: next_rule(location)
+    S->>G: git changed_paths(root, rule_base)
+    G-->>S: invoice.py changed → this rule did work
+    S-->>CC: Rule: duplication
+</pre>
+    </div>
+    <figcaption>
+      <code>changed_paths</code>, not changed lines: rule 4's work is deletion,
+      which adds no lines and would otherwise read as no work at all.
+    </figcaption>
+  </figure>
+
+  <div class="callout good">
+    <p>
+      <strong>Measured, not asserted.</strong> In one Gilded Rose run the step that
+      cleared the last naming target is the same step where duplication first
+      appeared — intention <code>1→0</code>, duplication <code>0→1</code>. The loop
+      is in the data, not just the docs.
+    </p>
+  </div>
+
+  <h2><span class="num">Sequence 07</span>Completing, and committing through RACN</h2>
+  <p>
+    Completion runs three checks and then discards the session. Commits are a
+    separate server's job: refactor-mcp refuses the next step's edits until the
+    previous one is committed, but it never commits for you.
+  </p>
+
+  <figure>
+    <div class="scroll">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CC as Claude Code
+    participant S as refactor-mcp
+    participant R as racn-mcp
+    participant G as git + pytest
+    CC->>S: complete_refactoring(location)
+    S->>G: pytest --cov --cov-branch
+    G-->>S: passed · scope still fully covered
+    S->>G: git diff -U0 {base} (changed lines)
+    G-->>S: lines changed this refactoring
+    S->>S: any changed line hold a comment?
+    alt all three checks pass
+        S->>S: drop the session
+        S-->>CC: Phase: scope_required · rules summary<br/>+ "a clean result means no DETECTABLE smells"
+    else a check fails
+        S-->>CC: ToolError naming which check and how to fix it
+    end
+
+    CC->>R: commit(risk=proven_safe, intention=refactoring, comment)
+    R->>G: git add -A && git commit -m ". r <comment>"
+    G-->>R: commit sha
+    R-->>CC: Committed <sha>: ". r <comment>"
+</pre>
+    </div>
+    <figcaption>
+      RACN translates a named risk and intention into Arlo's notation, so
+      <code>. r</code> is generated and validated rather than hand-typed.
+    </figcaption>
+  </figure>
+
+  <h2>Every subprocess the server runs</h2>
+  <p>
+    No network calls, no daemons. The server shells out for exactly two kinds of
+    answer: what git knows about the tree, and what the test runner reports.
+  </p>
+
+  <div class="scroll-table">
+    <table>
+      <thead>
+        <tr><th>command</th><th>answers</th><th>called from</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="cmd">git status --porcelain</td><td>Is an earlier step uncommitted?</td><td>every write</td></tr>
+        <tr><td class="cmd">git rev-parse HEAD</td><td>Pin the scope's and the rule's base commit</td><td>declare_scope, entering a rule</td></tr>
+        <tr><td class="cmd">git diff --name-only</td><td>Which files changed since the rule began (deletions included)</td><td>the work gate</td></tr>
+        <tr><td class="cmd">git diff -U0</td><td>Which lines changed, for the comment check</td><td>complete_refactoring</td></tr>
+        <tr><td class="cmd">git merge-base --is-ancestor</td><td>Did a reset rewind past our base?</td><td>both gates</td></tr>
+        <tr><td class="cmd">pytest --junitxml=…</td><td>Pass or fail, and how many tests exist</td><td>every code write</td></tr>
+        <tr><td class="cmd">pytest --cov --cov-branch</td><td>Uncovered lines and which files were measured</td><td>check_coverage, completion</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Two details that caused real bugs</h3>
+  <p>
+    <code>PYTHONDONTWRITEBYTECODE=1</code> is set on every run. Python validates
+    <code>.pyc</code> files on whole-second mtime and size, so cached bytecode can
+    run stale code after a quick same-size edit or a revert — exactly the pattern
+    this server produces.
+  </p>
+  <p>
+    The project's own <code>.venv</code> interpreter is preferred over the server's,
+    so the suite runs with the dependencies the project actually declares rather
+    than the server's.
+  </p>
+
+  <h2>Where the state lives</h2>
+  <p>
+    Workflow state is a dictionary keyed by resolved project root — phase, active
+    rule, scope, the base commits, and which rules were skipped with a reason. It
+    is never written to disk.
+  </p>
+  <p>
+    That makes git the durable truth and <code>check_coverage</code> the resync:
+    call it after a server restart or when the repository changed underneath, and
+    the phase is recomputed from the tests. The cost is real, though — a restart
+    mid-refactoring loses the rule position, so the work gate sees "no production
+    change since <code>rule_base</code>" and asks for work that was already done.
+  </p>
+
+  <footer>
+    <p>
+      Sequences traced from <code>src/refactor_mcp/server.py</code> (tool bindings),
+      <code>service.py</code> (gates and orchestration),
+      <code>git_gate.py</code> and <code>languages/python.py</code> (subprocesses).
+      Frames are real JSON-RPC, trimmed for width.
+    </p>
+    <nav class="pair">
+      <a href="./state-machine.html">← The state machine</a>
+    </nav>
+  </footer>
+</div>
