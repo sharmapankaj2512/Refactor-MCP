@@ -113,9 +113,14 @@ def _classes(tree: ast.AST) -> list[ast.ClassDef]:
 
 
 def _feature_envy(tree: ast.AST) -> list[str]:
-    """Methods that only ever touch one parameter: the behaviour belongs on it."""
+    """Methods that only ever touch one parameter: the behaviour belongs on it.
+
+    Stateless classes are exempt. A class holding no state of its own whose
+    methods act on a collaborator is a strategy, and moving its method onto that
+    collaborator would recreate the branch the strategy exists to replace.
+    """
     findings = []
-    for node in _methods(tree):
+    for node in _stateful_methods(tree):
         parameters = [a.arg for a in node.args.args[1:]]
         if not parameters:
             continue
@@ -131,6 +136,20 @@ def _feature_envy(tree: ast.AST) -> list[str]:
                 f"feature envy: move it onto {envied[0]}"
             )
     return findings
+
+
+def _stateful_methods(tree: ast.AST) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+    """Methods of classes that hold state, where a parameter-only method stands out."""
+    methods = []
+    for owner in _classes(tree):
+        if not _assigned_attributes(owner):
+            continue
+        methods += [
+            child
+            for child in owner.body
+            if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+        ]
+    return methods
 
 
 def _primitive_obsession(tree: ast.AST) -> list[str]:
@@ -210,14 +229,21 @@ def _duplication(tree: ast.AST) -> list[str]:
 
 
 def _shotgun_surgery(tree: ast.AST) -> list[str]:
-    """One attribute written from many places: the concept should own its changes."""
+    """A field written from many places outside its own class.
+
+    Writes through `self` are excluded: a class changing its own field from
+    several of its own methods is encapsulation, which is the fix rather than
+    the smell.
+    """
     written: dict[str, set[str]] = defaultdict(set)
     for node in _methods(tree):
         for assigned in ast.walk(node):
             targets = _written_targets(assigned)
             for target in targets:
-                if isinstance(target, ast.Attribute) and isinstance(
-                    target.value, ast.Name
+                if (
+                    isinstance(target, ast.Attribute)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id != "self"
                 ):
                     written[f"{target.value.id}.{target.attr}"].add(node.name)
     return [

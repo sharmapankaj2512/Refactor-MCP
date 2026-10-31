@@ -182,6 +182,7 @@ def test_a_method_with_no_object_parameter_is_not_feature_envy():
 def test_a_predicate_on_a_parameter_is_still_feature_envy():
     source = (
         "class Shop:\n"
+        "    def __init__(self, items):\n        self.items = items\n"
         "    def _is_legendary(self, item):\n"
         "        return item.name == SULFURAS\n"
     )
@@ -338,3 +339,49 @@ def test_a_data_class_is_not_anaemic_when_other_classes_touch_only_their_own_dat
         "        other.total += 1\n"
     )
     assert "anaemic" not in _findings(source, Rule.INTENTION).lower()
+
+
+def test_a_class_writing_its_own_field_is_not_shotgun_surgery():
+    """`self.x` from several of its own methods is encapsulation, not scatter."""
+    source = (
+        "class Item:\n"
+        "    def __init__(self, quality):\n        self.quality = quality\n"
+        "    def raise_quality(self):\n        self.quality += 1\n"
+        "    def lower_quality(self):\n        self.quality -= 1\n"
+        "    def drop_quality(self):\n        self.quality = 0\n"
+    )
+    assert "shotgun" not in _findings(source, Rule.DUPLICATION).lower()
+
+
+def test_a_field_written_from_outside_its_class_is_still_shotgun_surgery():
+    source = (
+        "class Shop:\n"
+        "    def a(self, item):\n        item.quality += 1\n"
+        "    def b(self, item):\n        item.quality -= 1\n"
+        "    def c(self, item):\n        item.quality = 0\n"
+    )
+    assert "shotgun" in _findings(source, Rule.DUPLICATION).lower()
+
+
+def test_a_strategy_object_is_not_feature_envy():
+    """A stateless class whose whole job is acting on a collaborator is the pattern,
+    not the smell: moving its method onto the collaborator recreates the branch
+    the strategy replaced."""
+    source = (
+        "class Maturing:\n"
+        "    def age(self, item):\n"
+        "        item.raise_quality()\n"
+        "        item.advance_day()\n"
+    )
+    assert "envy" not in _findings(source, Rule.INTENTION).lower()
+
+
+def test_a_helper_on_a_stateful_class_is_still_feature_envy():
+    """A class that holds its own state has no excuse for a parameter-only method."""
+    source = (
+        "class Shop:\n"
+        "    def __init__(self, rate):\n        self.rate = rate\n"
+        "    def summary(self):\n        return self.rate\n"
+        "    def _raise_quality(self, item):\n        item.quality += 1\n"
+    )
+    assert "envy" in _findings(source, Rule.INTENTION).lower()
