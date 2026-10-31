@@ -42,6 +42,13 @@ from refactor_mcp.workspace import (
 OUTPUT_TAIL_CHARS = 6_000
 MIN_SKIP_REASON = 15
 
+DETECTOR_CAVEAT = (
+    "Note: a clean result means no DETECTABLE smells remain, which is not the "
+    "same as a good design. The detector cannot see misplaced responsibility, "
+    "a wrong abstraction, or a model that is merely procedural code with better "
+    "labels. Read the code before trusting it."
+)
+
 BASELINE_IS_FROZEN = (
     "Approved output is the behavioural baseline a refactoring is measured "
     "against, so it cannot be rewritten while refactoring. If the baseline is "
@@ -380,6 +387,7 @@ class RefactorService:
             Phase.SCOPE_REQUIRED,
             f"Refactoring complete: {scope.render()} is covered, the suite "
             f"passes, and no changed line holds a comment. {summary} "
+            f"{DETECTOR_CAVEAT} "
             f"{PHASE_GUIDANCE[Phase.SCOPE_REQUIRED]}",
             run.output,
         )

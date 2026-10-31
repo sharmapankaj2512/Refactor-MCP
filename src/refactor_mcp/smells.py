@@ -12,6 +12,8 @@ LONG_METHOD_STATEMENTS = 12
 READABLE_NUMBERS = frozenset({0, 1, 2, -1, -2, 100})
 MIN_NAME_LENGTH = 3
 BRANCHING_COMPARISONS = 3
+# Methods that hold no behaviour of their own.
+PLUMBING_METHODS = frozenset({"__init__", "__repr__", "__str__", "__eq__", "__hash__"})
 SCATTERED_WRITES = 3
 SEQUENCE_LENGTH = 2
 # Short names that are conventional rather than cryptic.
@@ -30,12 +32,84 @@ def find_python_smells(source: str, rule: Rule) -> list[str]:
 
 def _intention(tree: ast.AST) -> list[str]:
     return (
-        _feature_envy(tree)
+        _anaemic_models(tree)
+        + _feature_envy(tree)
         + _primitive_obsession(tree)
         + _long_methods(tree)
         + _magic_numbers(tree)
         + _cryptic_names(tree)
     )
+
+
+def _anaemic_models(tree: ast.AST) -> list[str]:
+    """A class holding data whose rules live elsewhere: the cause of feature envy.
+
+    Reported once, as the diagnosis the individual envy findings are symptoms of.
+    """
+    findings = []
+    for node in _classes(tree):
+        if _has_behaviour(node):
+            continue
+        attributes = _assigned_attributes(node)
+        manipulators = _methods_touching(tree, attributes, inside=node)
+        if attributes and manipulators:
+            findings.append(
+                f"line {node.lineno}: `{node.name}` holds data but no behaviour, "
+                f"while {len(manipulators)} method(s) elsewhere "
+                f"({', '.join(f'`{name}`' for name in manipulators)}) change it — "
+                "anaemic model: move those rules onto it"
+            )
+    return findings
+
+
+def _has_behaviour(node: ast.ClassDef) -> bool:
+    """Whether the class does anything beyond holding and presenting its data."""
+    return any(
+        isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+        and child.name not in PLUMBING_METHODS
+        and not _is_property(child)
+        for child in node.body
+    )
+
+
+def _is_property(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    return any(
+        isinstance(decorator, ast.Name) and decorator.id == "property"
+        for decorator in node.decorator_list
+    )
+
+
+def _assigned_attributes(node: ast.ClassDef) -> frozenset[str]:
+    return frozenset(
+        target.attr
+        for statement in ast.walk(node)
+        for target in _written_targets(statement)
+        if isinstance(target, ast.Attribute)
+    )
+
+
+def _methods_touching(
+    tree: ast.AST, attributes: frozenset[str], *, inside: ast.ClassDef
+) -> list[str]:
+    """Methods outside `inside` that write any of `attributes` on a parameter."""
+    own = {child for child in ast.walk(inside)}
+    touching = []
+    for method in _methods(tree):
+        if method in own:
+            continue
+        written = {
+            target.attr
+            for statement in ast.walk(method)
+            for target in _written_targets(statement)
+            if isinstance(target, ast.Attribute)
+        }
+        if written & attributes:
+            touching.append(method.name)
+    return sorted(touching)
+
+
+def _classes(tree: ast.AST) -> list[ast.ClassDef]:
+    return [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
 
 
 def _feature_envy(tree: ast.AST) -> list[str]:

@@ -70,6 +70,12 @@ around it.
   `write_file`/`edit_file` trigger move the workflow.
 - **Coverage includes branches.** An `if` whose false path no test takes counts
   as uncovered, so the approval test may need more than one case.
+- **A clean `rule_status` is not a finished refactoring.** The detector sees
+  named smells, not design. It cannot tell you the model is wrong, only that it
+  found nothing it knows about. Read the final code.
+- **Fix the anaemic model first.** When `rule_status` reports both an anaemic
+  model and several feature-envy findings, they are one problem: the class holds
+  data its rules should own. Move the behaviour and the symptoms go with it.
 - **Extracting methods is not revealing intention.** If every new method takes
   the same parameter and touches only that parameter, you have relabelled
   procedural code: that is feature envy, and the behaviour belongs on the data.

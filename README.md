@@ -99,11 +99,12 @@ per rule:
 
 | Rule | Detects |
 |---|---|
-| `intention` | **feature envy** (a method that only touches its parameter), **primitive obsession** (a value compared against several constants), long methods, magic numbers, cryptic names |
+| `intention` | **anaemic model** (a class holding data whose rules live elsewhere), **feature envy** (a method that only touches its parameter), **primitive obsession** (a value compared against several constants), long methods, magic numbers, cryptic names |
 | `duplication` | **shotgun surgery** (one field written from many methods), repeated statement sequences across functions (matched on shape, so duplicated control flow around differing bodies still counts) |
 | `fewest_elements` | private methods nothing calls |
 
-Feature envy and primitive obsession are the two that matter most, because extracting methods is
+The anaemic-model finding names the *cause*; feature envy and primitive obsession are usually its
+symptoms. Extracting methods is
 not the same as revealing intention: a wall of small methods that all poke at the same object is
 still procedural code with better labels. That is the trap this server itself fell into on the
 Gilded Rose kata — seven methods, each taking `item` and touching nothing else, with `item.name`
@@ -112,6 +113,12 @@ visible.
 
 TypeScript has no detector yet and falls back to the generic guidance rather than claiming a clean
 scope.
+
+**A clean detector is not a good design.** `complete_refactoring` says so explicitly, because the
+detector cannot see misplaced responsibility, a wrong abstraction, or a model that is merely
+procedural code with better labels. Every improvement to these detectors in this repo came from a
+human reading the result and saying it still looked half done — the tool narrows what you have to
+look for, it does not replace looking.
 
 `next_rule` refuses while the tests fail, and `complete_refactoring` requires the suite to pass,
 the scope to still be covered, and no line changed during the refactoring to hold a comment. Say it

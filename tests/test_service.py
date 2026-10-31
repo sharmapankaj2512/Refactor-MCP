@@ -833,3 +833,16 @@ def test_an_edit_that_trades_intention_for_less_duplication_is_reported(
 
     assert "outranks" in report.message
     assert "intention" in report.message
+
+
+def test_completing_says_a_clean_detector_is_not_a_proxy_for_reading_the_code(
+    service, adapter, tree, project
+):
+    """The gap a human caught: detectors miss anaemic models and wrong abstractions."""
+    _to_refactoring(service, adapter, project)
+    tree.changes = [" M invoice.code"]
+
+    message = service.complete_refactoring(str(project)).message
+
+    assert "detectable" in message.lower()
+    assert "read the code" in message.lower()

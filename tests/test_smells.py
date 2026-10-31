@@ -257,3 +257,84 @@ def test_writes_to_a_plain_local_are_not_shotgun_surgery():
         "    def c(self, item):\n        total = 3\n        return total + item.x\n"
     )
     assert "shotgun" not in _findings(source, Rule.DUPLICATION).lower()
+
+
+def test_an_anaemic_data_class_is_reported_as_the_root_cause():
+    """Four feature-envy symptoms have one cause: the class holds no behaviour."""
+    source = (
+        "class Item:\n"
+        "    def __init__(self, name, quality):\n"
+        "        self.name = name\n"
+        "        self.quality = quality\n"
+        "\n"
+        "    def __repr__(self):\n"
+        "        return self.name\n"
+        "\n\n"
+        "class Shop:\n"
+        "    def _raise(self, item):\n"
+        "        item.quality += 1\n"
+        "\n"
+        "    def _lower(self, item):\n"
+        "        item.quality -= 1\n"
+    )
+    findings = _findings(source, Rule.INTENTION)
+    assert "`Item`" in findings
+    assert "anaemic" in findings.lower()
+
+
+def test_a_class_with_behaviour_is_not_anaemic():
+    source = (
+        "class Item:\n"
+        "    def __init__(self, quality):\n"
+        "        self.quality = quality\n"
+        "\n"
+        "    def age(self):\n"
+        "        self.quality -= 1\n"
+        "\n\n"
+        "class Shop:\n"
+        "    def run(self, item):\n"
+        "        item.age()\n"
+    )
+    assert "anaemic" not in _findings(source, Rule.INTENTION).lower()
+
+
+def test_a_data_class_nobody_manipulates_is_not_anaemic():
+    """A plain value holder is fine; the smell is behaviour living elsewhere."""
+    source = (
+        "class Point:\n"
+        "    def __init__(self, x, y):\n"
+        "        self.x = x\n"
+        "        self.y = y\n"
+    )
+    assert "anaemic" not in _findings(source, Rule.INTENTION).lower()
+
+
+def test_a_class_whose_only_methods_are_properties_is_still_anaemic():
+    source = (
+        "class Item:\n"
+        "    def __init__(self, quality):\n"
+        "        self.quality = quality\n"
+        "\n"
+        "    @property\n"
+        "    def doubled(self):\n"
+        "        return self.quality * 2\n"
+        "\n\n"
+        "class Shop:\n"
+        "    def _bump(self, item):\n"
+        "        item.quality += 1\n"
+    )
+    assert "anaemic" in _findings(source, Rule.INTENTION).lower()
+
+
+def test_a_data_class_is_not_anaemic_when_other_classes_touch_only_their_own_data():
+    """Writes elsewhere to *different* attributes are not this class's rules leaking."""
+    source = (
+        "class Point:\n"
+        "    def __init__(self, x):\n"
+        "        self.x = x\n"
+        "\n\n"
+        "class Counter:\n"
+        "    def bump(self, other):\n"
+        "        other.total += 1\n"
+    )
+    assert "anaemic" not in _findings(source, Rule.INTENTION).lower()
